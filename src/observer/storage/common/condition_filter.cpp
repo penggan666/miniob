@@ -130,7 +130,6 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
     }else{
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
-    
   }
 
   return init(left, right, type_left, condition.comp);

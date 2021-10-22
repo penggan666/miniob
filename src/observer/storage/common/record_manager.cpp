@@ -200,7 +200,6 @@ RC RecordPageHandler::update_record(const Record *rec) {
       LOG_ERROR("Failed to mark page dirty. ret=%s", strrc(ret));
     }
   }
-  LOG_ERROR("Update record. page num=%d,slot=%d", rec->rid.page_num, rec->rid.slot_num);
   LOG_TRACE("Update record. page num=%d,slot=%d", rec->rid.page_num, rec->rid.slot_num);
   return ret;
 }

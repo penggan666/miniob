@@ -574,13 +574,21 @@ RC Table::update_record(Trx *trx, Record *record,const char *attribute_name, con
     }
     const int normal_field_start_index = table_meta_.sys_field_num();
     const int normal_field_length = table_meta_.field_num()-table_meta_.sys_field_num();
+    Value value1;
+    value1.type=value->type;
+    value1.data=value->data;
     for (int i = 0; i < normal_field_length; i++){
         const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
         if (strcmp(field->name(),attribute_name) == 0){
-            if (field->type()!=value->type){
-              return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+            if (field->type() != value->type){
+              int value_data;
+              if (field->type()==DATES && value->type==CHARS && (value_data=dateToInt((char*)value->data))!=-1){
+                  memcpy(value1.data,&value_data, sizeof(value_data));
+              }else{
+                return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+              }
             }
-            memcpy(record->data+field->offset(), value->data, field->len());
+            memcpy(record->data+field->offset(), value1.data, field->len());
         }
     }
     //事务部分和对索引部分的更新还未实现

@@ -132,7 +132,9 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
     }
     
   }
-
+  if(type_left==DATES){//进入该if内说明两个比较都是attr, 且都是DATES
+    type_left=INTS;
+  }
   return init(left, right, type_left, condition.comp);
 }
 

@@ -264,6 +264,14 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   std::stringstream ss;
   if (tuple_sets.size() > 1) {
     // 本次查询了多张表，需要做join操作
+    //TODO: add join 对查询结果进行笛卡儿积
+    // TupleSet join_tuple_set;
+    // TupleSchema schema_;
+    // //初始化schema
+    // for(const auto &tuple_set_: tuple_sets){
+    //   schema_.append(tuple_set_.get_schema());
+    // }
+    
   } else {
     // 当前只查询一张表，直接返回结果即可
     tuple_sets.front().print(ss);

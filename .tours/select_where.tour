@@ -1,0 +1,47 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "select_where",
+  "steps": [
+    {
+      "file": "src/observer/sql/executor/execute_stage.cpp",
+      "description": "# do_select",
+      "line": 218,
+      "selection": {
+        "start": {
+          "line": 218,
+          "character": 18
+        },
+        "end": {
+          "line": 218,
+          "character": 27
+        }
+      }
+    },
+    {
+      "file": "src/observer/sql/executor/execute_stage.cpp",
+      "description": "# create_selection_executor",
+      "line": 230,
+      "selection": {
+        "start": {
+          "line": 230,
+          "character": 10
+        },
+        "end": {
+          "line": 230,
+          "character": 35
+        }
+      }
+    },
+    {
+      "file": "src/observer/storage/common/condition_filter.cpp",
+      "description": "# filter record",
+      "line": 138
+    },
+    {
+      "file": "src/observer/sql/executor/execute_stage.cpp",
+      "description": "# -condition filter",
+      "line": 328
+    }
+  ],
+  "ref": "yjt"
+}

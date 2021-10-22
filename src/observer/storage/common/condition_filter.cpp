@@ -41,7 +41,8 @@ DefaultConditionFilter::~DefaultConditionFilter()
 
 RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType attr_type, CompOp comp_op)
 {
-  if (attr_type < CHARS || attr_type > FLOATS) {
+  //TODO: add date
+  if (attr_type < CHARS || attr_type > DATES) {
     LOG_ERROR("Invalid condition with unsupported attribute type: %d", attr_type);
     return RC::INVALID_ARGUMENT;
   }
@@ -117,8 +118,19 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
   //  }
   // NOTE：这里没有实现不同类型的数据比较，比如整数跟浮点数之间的对比
   // 但是选手们还是要实现。这个功能在预选赛中会出现
+  //TODO: add date 对于date的比较， 应该注意判断比较的type是string， 且string是符合date的情况
   if (type_left != type_right) {
-    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    int date_i;
+    if(left.is_attr&&type_left==DATES&&(!right.is_attr)&&type_right==CHARS&&(date_i=dateToInt((char*)right.value))!=-1){
+      memcpy(right.value,&date_i, sizeof(date_i));
+      type_left=INTS;//DATE使用int存储，并且完全可以复用int的比较
+    }else if((!left.is_attr)&&type_left==CHARS&&right.is_attr&&type_right==DATES&&(date_i=dateToInt((char*)left.value))!=-1){
+      memcpy(left.value,&date_i, sizeof(date_i));
+      type_left=INTS;
+    }else{
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+    
   }
 
   return init(left, right, type_left, condition.comp);

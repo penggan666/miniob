@@ -41,6 +41,11 @@
       "file": "src/observer/sql/executor/execute_stage.cpp",
       "description": "# -condition filter",
       "line": 328
+    },
+    {
+      "file": "src/observer/storage/common/condition_filter.cpp",
+      "description": "# --init (left cmp right)",
+      "line": 62
     }
   ],
   "ref": "yjt"

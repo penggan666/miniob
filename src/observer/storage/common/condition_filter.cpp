@@ -131,7 +131,9 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
   }
-
+  if(type_left==DATES){//进入该if内说明两个比较都是attr, 且都是DATES
+    type_left=INTS;
+  }
   return init(left, right, type_left, condition.comp);
 }
 

@@ -121,7 +121,7 @@ void TupleSchema::print(std::ostream &os) const {
   for (const auto &field: fields_) {
     table_names.insert(field.table_name());
   }
-
+  //TODO: add join
   for (std::vector<TupleField>::const_iterator iter = fields_.begin(), end = --fields_.end();
        iter != end; ++iter) {
     if (table_names.size() > 1) {
@@ -236,7 +236,7 @@ void TupleRecordConverter::add_record(const char *record) {
         tuple.add(s, strlen(s));
       }
       break;
-      //TODO: add date
+      //TODO: add date select展示数据
       case DATES:{
         //取出int数据
         int value = *(int*)(record + field_meta->offset());

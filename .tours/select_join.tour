@@ -1,0 +1,21 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "select_join",
+  "steps": [
+    {
+      "file": "src/observer/sql/executor/tuple.h",
+      "selection": {
+        "start": {
+          "line": 63,
+          "character": 1
+        },
+        "end": {
+          "line": 85,
+          "character": 3
+        }
+      },
+      "description": "# TupleField_元数据"
+    }
+  ],
+  "ref": "yjt"
+}

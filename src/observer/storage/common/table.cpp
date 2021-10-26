@@ -568,6 +568,7 @@ RC Table::update_record(Trx *trx, ConditionFilter *filter, const char *attribute
     return rc;
 }
 
+//TODO: 实现update_record，暂时未考虑对索引的更新
 RC Table::update_record(Trx *trx, Record *record,const char *attribute_name, const Value *value, int *updated_count) {
     if (table_meta_.field(attribute_name) == nullptr){
         return RC::SCHEMA_FIELD_NOT_EXIST;

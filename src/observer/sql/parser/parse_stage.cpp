@@ -119,6 +119,7 @@ StageEvent *ParseStage::handle_request(StageEvent *event) {
     return nullptr;
   }
   RC ret = parse(sql.c_str(), result);
+  //TODO: 这里ssrt.errors是空，暂时注释掉
   if (ret != RC::SUCCESS) {
     // set error information to event
 //    const char *error = result->sstr.errors != nullptr ? result->sstr.errors : "Unknown error";

@@ -71,6 +71,7 @@ RC Db::create_table(const char *table_name, int attribute_count, const AttrInfo 
   return RC::SUCCESS;
 }
 
+// TODO: drop table的实现
 RC Db::drop_table(const char *table_name){
     RC rc = RC::SUCCESS;
     // check whether table exists

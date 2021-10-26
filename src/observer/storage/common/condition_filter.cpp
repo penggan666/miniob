@@ -123,16 +123,11 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
     int date_i;
     if(left.is_attr&&type_left==DATES&&(!right.is_attr)&&type_right==CHARS&&(date_i=dateToInt((char*)right.value))!=-1){
       memcpy(right.value,&date_i, sizeof(date_i));
-      type_left=INTS;//DATE使用int存储，并且完全可以复用int的比较
     }else if((!left.is_attr)&&type_left==CHARS&&right.is_attr&&type_right==DATES&&(date_i=dateToInt((char*)left.value))!=-1){
       memcpy(left.value,&date_i, sizeof(date_i));
-      type_left=INTS;
     }else{
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
-  }
-  if(type_left==DATES){//进入该if内说明两个比较都是attr, 且都是DATES
-    type_left=INTS;
   }
   return init(left, right, type_left, condition.comp);
 }
@@ -160,6 +155,8 @@ bool DefaultConditionFilter::filter(const Record &rec) const
       // 按照C字符串风格来定
       cmp_result = strcmp(left_value, right_value);
     } break;
+    //TODO: add date
+    case DATES:
     case INTS: {
       // 没有考虑大小端问题
       // 对int和float，要考虑字节对齐问题,有些平台下直接转换可能会跪

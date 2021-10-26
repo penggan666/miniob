@@ -1,0 +1,22 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "add_date_index",
+  "steps": [
+    {
+      "file": "src/observer/storage/common/table.cpp",
+      "description": "# create_index\n可以正常创建， 但是无法正常使用",
+      "line": 462,
+      "selection": {
+        "start": {
+          "line": 462,
+          "character": 11
+        },
+        "end": {
+          "line": 462,
+          "character": 23
+        }
+      }
+    }
+  ],
+  "ref": "addDate"
+}

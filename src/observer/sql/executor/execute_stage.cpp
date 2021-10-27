@@ -35,7 +35,7 @@ See the Mulan PSL v2 for more details. */
 
 using namespace common;
 
-RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, SelectExeNode &select_node,std::vector<TupleField>& tmp_column);
+RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, SelectExeNode &select_node);
 
 //! Constructor
 ExecuteStage::ExecuteStage(const char *tag) : Stage(tag) {}
@@ -227,11 +227,12 @@ CompOp rever_com(const CompOp& c){//反转比较符号
     return c;
   }
 }
+//判断TupleSet是是否有对应attr如果有返回index, 没有返回-1
 int getIndexOfCondition(const TupleSet& tuple_set,const RelAttr& attr){
   TupleSchema ts=tuple_set.get_schema();
   std::vector<TupleField> fileds=ts.fields();
   for(int i=0;i<fileds.size();i++){
-    if(strcmp(fileds[i].table_name(),attr.relation_name)==0&&strcmp(fileds[i].field_name(),attr.attribute_name)){
+    if(strcmp(fileds[i].table_name(),attr.relation_name)==0&&strcmp(fileds[i].field_name(),attr.attribute_name)==0){
       return i;
     }
   }
@@ -240,7 +241,7 @@ int getIndexOfCondition(const TupleSet& tuple_set,const RelAttr& attr){
 void init_join(const TupleSet& join_left_set,const TupleSet& join_right_set,const Condition* conditions,int condition_num,std::vector<std::vector<int>> &inv_field,std::vector<CompOp> &inv_com){
   for(int i=0;i<condition_num;i++){
     Condition c=conditions[i];
-    if(c.left_is_attr&&c.right_is_attr&&strcmp(c.left_attr.relation_name,c.right_attr.relation_name)){//左右都是属性列, 并且所属表不同
+    if(c.left_is_attr&&c.right_is_attr&&strcmp(c.left_attr.relation_name,c.right_attr.relation_name)!=0){//左右都是属性列, 并且所属表不同
       int left_index,right_index;
       if((left_index=getIndexOfCondition(join_left_set,c.left_attr))!=-1&&((right_index=getIndexOfCondition(join_right_set,c.right_attr))!=-1)){//判断左边在左Tuple,比较理想的状况
         inv_field.push_back({left_index,right_index,});
@@ -267,17 +268,17 @@ bool isRightRecord(std::shared_ptr<TupleValue> left_value,std::shared_ptr<TupleV
       return cmp_result >= 0;
     case GREAT_THAN:
       return cmp_result > 0;
-
     default:
       break;
   }
+  return false;
 }
 //TODO: add join join tuple
-TupleSet tuple_join(const TupleSet& join_left_set,const TupleSet& join_right_set,const Condition* conditions,int condition_num){
+TupleSet tuple_join(TupleSet& join_left_set,const TupleSet& join_right_set,const Condition* conditions,int condition_num){
   TupleSet result;
   std::vector<std::vector<int>> inv_field;//左右涉及的列, 例如(2,1)表示对join_left_set index2列和join_right_set index1列比较
   std::vector<CompOp> inv_com;//比较符号
-  init_join(join_left_set,join_right_set,conditions,condition_num,inv_field,inv_com);
+  init_join(join_left_set,join_right_set,conditions,condition_num,inv_field,inv_com);//负责获取涉及两个表的过滤
   for(const Tuple& item_left:join_left_set.tuples()){
     for(const Tuple& item_right:join_right_set.tuples()){
       //对笛卡儿积的每条记录, 判断是否符合所有条件
@@ -288,6 +289,7 @@ TupleSet tuple_join(const TupleSet& join_left_set,const TupleSet& join_right_set
           break;
         }
       }
+      
       if(is_right_record){//该组合符合所有条件
         Tuple t;
         for(std::shared_ptr<TupleValue> tv:item_left.values()){
@@ -296,11 +298,39 @@ TupleSet tuple_join(const TupleSet& join_left_set,const TupleSet& join_right_set
         for(std::shared_ptr<TupleValue> tv2:item_right.values()){
           t.add(tv2);    
         }
+        
         result.add(std::move(t));
       }
     }
   }
-
+  TupleSchema res_schema;
+  res_schema.append(join_left_set.get_schema());
+  res_schema.append(join_right_set.get_schema());
+  result.set_schema(res_schema);
+  return result;
+}
+//TODO: add join 最后展示要按照select时的顺序
+void getPrintIndex(const Selects &selects,const std::vector<TupleField> &fields,std::vector<int>& realField){
+  for(int i=selects.attr_num-1;i>=0;i--){
+    const RelAttr &attr=selects.attributes[i];
+    if(nullptr==attr.relation_name&&(0==strcmp("*",attr.attribute_name))){//单独一个*, 所有字段都加入
+      for(int j=0;j<fields.size();j++){
+        realField.push_back(j);//直接返回顺序打印就行
+      }
+    }else if(0==strcmp("*",attr.attribute_name)){//带* 但有表名, 将所有该表的加入
+      for(int j=0;j<fields.size();j++){
+        if(strcmp(fields[j].table_name(),attr.relation_name)==0){
+          realField.push_back(j);
+        }
+      }
+    }else{//既有表明, 又有属性名
+      for(int j=0;j<fields.size();j++){
+        if(strcmp(fields[j].table_name(),attr.relation_name)==0&&strcmp(fields[j].field_name(),attr.attribute_name)==0){
+          realField.push_back(j);
+        }
+      }
+    }
+  }
 }
 // 这里没有对输入的某些信息做合法性校验，比如查询的列名、where条件中的列名等，没有做必要的合法性校验
 // 需要补充上这一部分. 校验部分也可以放在resolve，不过跟execution放一起也没有关系
@@ -312,11 +342,11 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   const Selects &selects = sql->sstr.selection;
   // 把所有的表和只跟这张表关联的condition都拿出来，生成最底层的select 执行节点
   std::vector<SelectExeNode *> select_nodes;
-  std::vector<TupleField> tmp_column;//TODO:add join  将没有出现在select后, 但是join需要使用的列记录下来, 未来展示时将其删除
   for (size_t i = 0; i < selects.relation_num; i++) {
     const char *table_name = selects.relations[i];
     SelectExeNode *select_node = new SelectExeNode;
-    rc = create_selection_executor(trx, selects, db, table_name, *select_node,tmp_column);
+    rc = create_selection_executor(trx, selects, db, table_name, *select_node);
+    
     if (rc != RC::SUCCESS) {
       session_event->set_response("FAILURE\n");
       delete select_node;
@@ -334,7 +364,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
     end_trx_if_need(session, trx, false);
     return RC::SQL_SYNTAX;
   }
-
+  // LOG_ERROR("create_selection_executor success!!!\n");
   std::vector<TupleSet> tuple_sets;
   for (SelectExeNode *&node: select_nodes) {
     TupleSet tuple_set;
@@ -346,23 +376,36 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
       end_trx_if_need(session, trx, false);
       return rc;
     } else {
-      tuple_sets.push_back(std::move(tuple_set));
+      // tuple_sets.push_back(std::move(tuple_set));
+      //修改顺序
+      tuple_sets.insert(tuple_sets.begin(),std::move(tuple_set));
     }
   }
 
   std::stringstream ss;
   if (tuple_sets.size() > 1) {
     //TODO: add join 对tuple进行join操作
-    // LOG_ERROR("%d\n",tuple_sets.size());
-    tuple_sets.front().print(ss);
     // //初始化schema
-    // TupleSet join_left_set;
-    // TupleSchema join_schema;
-    // for(const auto &join_right_set: tuple_sets){//遍历所有表的查询结果
-    //   join_left_set=tuple_join(join_left_set,join_right_set,selects.conditions,selects.condition_num);
-    // }
-    //注意将临时列删除
-    // join_left_set.print(ss);//将最终结果打印 
+    TupleSet join_left_set;
+    int skip=true;
+    for(const auto &join_right_set: tuple_sets){//遍历所有表的查询结果
+      if(skip){//第一次初始化
+        skip=false;
+        join_left_set.set_schema(join_right_set.get_schema());
+        for(const Tuple& item_right:join_right_set.tuples()){
+          Tuple tmp;
+          for(std::shared_ptr<TupleValue> t:item_right.values()){
+            tmp.add(t);
+          }
+          join_left_set.add(std::move(tmp));
+        }
+        continue;
+      }
+      join_left_set=tuple_join(join_left_set,join_right_set,selects.conditions,selects.condition_num);
+    }
+    std::vector<int> realField;
+    getPrintIndex(selects,join_left_set.get_schema().fields(),realField);
+    join_left_set.print_rm_tmp(ss,realField);
   } else {
     // 当前只查询一张表，直接返回结果即可
     tuple_sets.front().print(ss);
@@ -377,7 +420,6 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
 }
 
 bool match_table(const Selects &selects, const char *table_name_in_condition, const char *table_name_to_match) {
-  LOG_ERROR("%s,%s",table_name_in_condition, table_name_to_match);
   if (table_name_in_condition != nullptr) {
     return 0 == strcmp(table_name_in_condition, table_name_to_match);
   }
@@ -395,18 +437,6 @@ static RC schema_add_field(Table *table, const char *field_name, TupleSchema &sc
   schema.add_if_not_exists(field_meta->type(), table->name(), field_meta->name());
   return RC::SUCCESS;
 }
-//TODO: add join
-static RC schema_add_field_join(Table *table, const char *field_name, TupleSchema &schema,std::vector<TupleField>& tmp_column) {
-  const FieldMeta *field_meta = table->table_meta().field(field_name);
-  if (nullptr == field_meta) {
-    LOG_WARN("No such field. %s.%s", table->name(), field_name);
-    return RC::SCHEMA_FIELD_MISSING;
-  }
-  if(schema.add_if_not_exists_for_join(field_meta->type(), table->name(), field_meta->name())){
-    tmp_column.push_back(TupleField(field_meta->type(),table->name(),field_meta->name()));//当前缺失,并加入 说明一开始不在select选项中,标记临时
-  }
-  return RC::SUCCESS;
-}
   //TODO:add join 判断两个表中对比属性是否类型相同
   bool isRightCmp(Table& left_table,Table&right_table,const Condition& condition){
     AttrType type_left = UNDEFINED;
@@ -422,7 +452,7 @@ static RC schema_add_field_join(Table *table, const char *field_name, TupleSchem
     return true;
   }
 // 把所有的表和只跟这张表关联的condition都拿出来，生成最底层的select 执行节点
-RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, SelectExeNode &select_node,std::vector<TupleField>& tmp_column) {
+RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, SelectExeNode &select_node) {
   // 列出跟这张表关联的Attr
   TupleSchema schema;
   Table * table = DefaultHandler::get_default().find_table(db, table_name);
@@ -430,7 +460,7 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
     LOG_WARN("No such table [%s] in db [%s]", table_name, db);
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
-
+  
   for (int i = selects.attr_num - 1; i >= 0; i--) {
     const RelAttr &attr = selects.attributes[i];
     if (nullptr == attr.relation_name || 0 == strcmp(table_name, attr.relation_name)) {
@@ -447,7 +477,7 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
       }
     }
   }
-
+  
   // 找出仅与此表相关的过滤条件, 或者都是值的过滤条件
   std::vector<DefaultConditionFilter *> condition_filters;
   for (size_t i = 0; i < selects.condition_num; i++) {
@@ -477,20 +507,15 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
               if(!isRightCmp(*table,*table_right,condition)){
                 return RC::SCHEMA_FIELD_TYPE_MISMATCH;
               }
-              //判断该属性列是否已经存在,如果不存在将其加入, 并添加到tmp_column
-              schema_add_field_join(table,condition.left_attr.attribute_name,schema,tmp_column);
+              schema_add_field(table,condition.left_attr.attribute_name,schema);
     }else if(match_table(selects, condition.right_attr.relation_name, table_name)){//左右都是属性值,但只有右属性值属于当前表
         Table * table_left = DefaultHandler::get_default().find_table(db, condition.left_attr.relation_name);
         if(!isRightCmp(*table_left,*table,condition)){
           return RC::SCHEMA_FIELD_TYPE_MISMATCH;
         }
-        // LOG_ERROR("schema_add_field_join %s",condition.right_attr.relation_name,);
-        schema_add_field_join(table,condition.right_attr.attribute_name,schema,tmp_column);
-    }
-    else{
-        return RC::SCHEMA_TABLE_NOT_EXIST;
+        schema_add_field(table,condition.right_attr.attribute_name,schema);
     }
   }
-
+  
   return select_node.init(trx, table, std::move(schema), std::move(condition_filters));
 }

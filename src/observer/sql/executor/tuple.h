@@ -109,7 +109,7 @@ public:
   }
 
   void print(std::ostream &os) const;
-  void print_rm_tmp(std::ostream &os,std::vector<TupleField>& tmp_column) const;
+  void print_rm_tmp(std::ostream &os,std::vector<int>& tmp_column) const;
 public:
   static void from_table(const Table *table, TupleSchema &schema);
 private:
@@ -140,7 +140,7 @@ public:
   const std::vector<Tuple> &tuples() const;
 
   void print(std::ostream &os) const;
-  void print_rm_tmp(std::ostream &os,std::vector<TupleField>& tmp_column) const;
+  void print_rm_tmp(std::ostream &os,std::vector<int>& real_column) const;
 public:
   const TupleSchema &schema() const {
     return schema_;

@@ -148,8 +148,18 @@ void TupleSchema::print(std::ostream &os) const {
   os << fields_.back().field_name() << std::endl;
 }
 //TODO: add join schema_print_rm_tmp 去掉临时列
-void TupleSchema::print_rm_tmp(std::ostream &os,std::vector<TupleField>& tmp_column)const{
-
+void TupleSchema::print_rm_tmp(std::ostream &os,std::vector<int>& real_column)const{
+  if (fields_.empty()) {
+    os << "No schema";
+    return;
+  }
+  int i;
+  for(i=0;i<real_column.size()-1;i++){
+      os << fields_[real_column[i]].table_name() << ".";
+      os << fields_[real_column[i]].field_name() << "|";
+  }
+  os << fields_[real_column[i]].table_name() <<".";
+  os << fields_[real_column[i]].field_name() << std::endl;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -200,8 +210,26 @@ void TupleSet::print(std::ostream &os) const {
   }
 }
 //TODO: add join  去掉临时列
-void TupleSet::print_rm_tmp(std::ostream &os,std::vector<TupleField>& tmp_column) const{
+void TupleSet::print_rm_tmp(std::ostream &os,std::vector<int>& real_column) const{
   //先遍历获得一个真实列的索引集合, 比如0,2,3,4 ,然后根据上边的逻辑遍历集合
+  if (schema_.fields().empty()) {
+    LOG_WARN("Got empty schema");
+    return;
+  }
+
+  schema_.print_rm_tmp(os,real_column);
+  
+  for (const Tuple &item : tuples_) {
+    const std::vector<std::shared_ptr<TupleValue>> &values = item.values();
+    int i;
+    for(i=0;i<real_column.size()-1;i++){
+      std::shared_ptr<TupleValue> tv=values[real_column[i]];
+      tv->to_string(os);
+      os << " | ";
+  }
+    values[real_column[i]]->to_string(os);
+    os << std::endl;
+  }
 }
 void TupleSet::set_schema(const TupleSchema &schema) {
   schema_ = schema;

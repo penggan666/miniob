@@ -91,6 +91,18 @@ void TupleSchema::add_if_not_exists(AttrType type, const char *table_name, const
 
   add(type, table_name, field_name);
 }
+//TODO: add join add_if_not_exists_for_join
+bool TupleSchema::add_if_not_exists_for_join(AttrType type, const char *table_name, const char *field_name) {
+  for (const auto &field: fields_) {
+    if (0 == strcmp(field.table_name(), table_name) &&
+        0 == strcmp(field.field_name(), field_name)) {
+      return false;
+    }
+  }
+
+  add(type, table_name, field_name);
+  return true;
+}
 
 void TupleSchema::append(const TupleSchema &other) {
   fields_.reserve(fields_.size() + other.fields_.size());
@@ -134,6 +146,20 @@ void TupleSchema::print(std::ostream &os) const {
     os << fields_.back().table_name() << ".";
   }
   os << fields_.back().field_name() << std::endl;
+}
+//TODO: add join schema_print_rm_tmp 去掉临时列
+void TupleSchema::print_rm_tmp(std::ostream &os,std::vector<int>& real_column)const{
+  if (fields_.empty()) {
+    os << "No schema";
+    return;
+  }
+  int i;
+  for(i=0;i<real_column.size()-1;i++){
+      os << fields_[real_column[i]].table_name() << ".";
+      os << fields_[real_column[i]].field_name() << " | ";
+  }
+  os << fields_[real_column[i]].table_name() <<".";
+  os << fields_[real_column[i]].field_name() << std::endl;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -183,7 +209,28 @@ void TupleSet::print(std::ostream &os) const {
     os << std::endl;
   }
 }
+//TODO: add join  去掉临时列
+void TupleSet::print_rm_tmp(std::ostream &os,std::vector<int>& real_column) const{
+  //先遍历获得一个真实列的索引集合, 比如0,2,3,4 ,然后根据上边的逻辑遍历集合
+  if (schema_.fields().empty()) {
+    LOG_WARN("Got empty schema");
+    return;
+  }
 
+  schema_.print_rm_tmp(os,real_column);
+  
+  for (const Tuple &item : tuples_) {
+    const std::vector<std::shared_ptr<TupleValue>> &values = item.values();
+    int i;
+    for(i=0;i<real_column.size()-1;i++){
+      std::shared_ptr<TupleValue> tv=values[real_column[i]];
+      tv->to_string(os);
+      os << " | ";
+  }
+    values[real_column[i]]->to_string(os);
+    os << std::endl;
+  }
+}
 void TupleSet::set_schema(const TupleSchema &schema) {
   schema_ = schema;
 }
@@ -247,7 +294,7 @@ void TupleRecordConverter::add_record(const char *record) {
         std::stringstream ss;
 	      ss << year << "-" << std::setw(2) << std::setfill('0') << month<<"-"<<std::setw(2) << std::setfill('0')<<day;
         const char *s=ss.str().c_str();
-        tuple.add(s, strlen(s));
+        tuple.add(s, strlen(s));//TODO:join 注意tuple阶段的date类型会被初始化位StringValue
       }
       break;
       default: {

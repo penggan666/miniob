@@ -156,7 +156,7 @@ void TupleSchema::print_rm_tmp(std::ostream &os,std::vector<int>& real_column)co
   int i;
   for(i=0;i<real_column.size()-1;i++){
       os << fields_[real_column[i]].table_name() << ".";
-      os << fields_[real_column[i]].field_name() << "|";
+      os << fields_[real_column[i]].field_name() << " | ";
   }
   os << fields_[real_column[i]].table_name() <<".";
   os << fields_[real_column[i]].field_name() << std::endl;

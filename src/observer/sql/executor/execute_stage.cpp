@@ -332,6 +332,53 @@ void getPrintIndex(const Selects &selects,const std::vector<TupleField> &fields,
     }
   }
 }
+//做一些合法性判断
+bool isRightSelect(const char *db,const Selects& st){
+  std::set<std::string> mul_col_name;//存在重复的字段名称 例如table1和table2中都有id列
+  std::set<std::string> tmp;//用于重复性判断
+  for(size_t i=0;i<st.relation_num;i++){
+    const char *table_name = st.relations[i];
+    Table * table = DefaultHandler::get_default().find_table(db, table_name);
+    const TableMeta &table_meta = table->table_meta();
+    const int field_num = table_meta.field_num();
+    for (size_t j = 0; j < field_num; j++) {
+      const FieldMeta *field_meta = table_meta.field(j);
+      if (field_meta->visible()) {
+        if(tmp.count(field_meta->name())==0){
+          tmp.insert(field_meta->name());
+        }else{
+          mul_col_name.insert(field_meta->name());
+        }
+      }
+    }
+  }
+  //对搜索字段判断是否无歧义
+  for (int i = st.attr_num - 1; i >= 0; i--) {
+    const RelAttr &attr = st.attributes[i];
+    if((strcmp(attr.attribute_name,"*")!=0&&tmp.count(attr.attribute_name)==0)|| (nullptr== attr.relation_name&&mul_col_name.count(attr.attribute_name)!=0)){//不存在的列，或者歧义列
+      return false;
+    }
+  }
+  //对条件判断是否有歧义
+    for (size_t i = 0; i < st.condition_num; i++) {
+    const Condition &condition = st.conditions[i];
+    if(condition.left_is_attr){
+      
+      if(tmp.count(condition.left_attr.attribute_name)==0||(nullptr==condition.left_attr.relation_name&&mul_col_name.count(condition.left_attr.attribute_name)!=0)){
+        LOG_ERROR("condition ERROR!");
+        return false;
+      }
+    }
+    if(condition.right_is_attr){
+      
+      if(tmp.count(condition.right_attr.attribute_name)==0||(nullptr==condition.right_attr.relation_name&&mul_col_name.count(condition.right_attr.attribute_name)!=0)){
+        LOG_ERROR("condition ERROR!");
+        return false;
+      }
+    }
+    }
+  return true;
+}
 // 这里没有对输入的某些信息做合法性校验，比如查询的列名、where条件中的列名等，没有做必要的合法性校验
 // 需要补充上这一部分. 校验部分也可以放在resolve，不过跟execution放一起也没有关系
 RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_event) {
@@ -342,6 +389,13 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   const Selects &selects = sql->sstr.selection;
   // 把所有的表和只跟这张表关联的condition都拿出来，生成最底层的select 执行节点
   std::vector<SelectExeNode *> select_nodes;
+  if(!isRightSelect(db,selects)){
+    LOG_ERROR("SQL ERROR!");
+    session_event->set_response("FAILURE\n");
+    end_trx_if_need(session, trx, false);
+    return RC::SQL_SYNTAX;
+  }
+
   for (size_t i = 0; i < selects.relation_num; i++) {
     const char *table_name = selects.relations[i];
     SelectExeNode *select_node = new SelectExeNode;
@@ -364,7 +418,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
     end_trx_if_need(session, trx, false);
     return RC::SQL_SYNTAX;
   }
-  // LOG_ERROR("create_selection_executor success!!!\n");
+
   std::vector<TupleSet> tuple_sets;
   for (SelectExeNode *&node: select_nodes) {
     TupleSet tuple_set;
@@ -419,14 +473,31 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   return rc;
 }
 
-bool match_table(const Selects &selects, const char *table_name_in_condition, const char *table_name_to_match) {
+bool match_table(const Selects &selects, const char *table_name_in_condition, const char *table_name_to_match,bool tableHasCon) {
   if (table_name_in_condition != nullptr) {
     return 0 == strcmp(table_name_in_condition, table_name_to_match);
   }
-
-  return selects.relation_num == 1;
+  
+  // return selects.relation_num == 1;
+  //多表情况下, 也可以不加表名
+  return tableHasCon;
 }
-
+bool isTableHasCon(const Table* table,const Condition &condition){
+    const TableMeta &table_meta = table->table_meta();
+    const int field_num = table_meta.field_num();
+    for (size_t j = 0; j < field_num; j++) {
+      const FieldMeta *field_meta = table_meta.field(j);
+      if (field_meta->visible()) {
+        if(condition.left_is_attr&&strcmp(field_meta->name(),condition.left_attr.attribute_name)==0){
+          return true;
+        }
+        if(condition.right_is_attr&&strcmp(field_meta->name(),condition.right_attr.attribute_name)==0){
+          return true;
+        }
+      }
+    }
+    return false;
+}
 static RC schema_add_field(Table *table, const char *field_name, TupleSchema &schema) {
   const FieldMeta *field_meta = table->table_meta().field(field_name);
   if (nullptr == field_meta) {
@@ -471,22 +542,24 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
       } else {
         // 列出这张表相关字段
         RC rc = schema_add_field(table, attr.attribute_name, schema);
+        //TODO: fix join 不在这里判断字段是否存在， 对于多表查询，有可能是其他表的字段
         if (rc != RC::SUCCESS) {
           return rc;
         }
       }
     }
   }
-  
+    
   // 找出仅与此表相关的过滤条件, 或者都是值的过滤条件
   std::vector<DefaultConditionFilter *> condition_filters;
   for (size_t i = 0; i < selects.condition_num; i++) {
     const Condition &condition = selects.conditions[i];
+    bool tableHasCon=isTableHasCon(table,condition);
     if ((condition.left_is_attr == 0 && condition.right_is_attr == 0) || // 两边都是值
-        (condition.left_is_attr == 1 && condition.right_is_attr == 0 && match_table(selects, condition.left_attr.relation_name, table_name)) ||  // 左边是属性右边是值
-        (condition.left_is_attr == 0 && condition.right_is_attr == 1 && match_table(selects, condition.right_attr.relation_name, table_name)) ||  // 左边是值，右边是属性名
+        (condition.left_is_attr == 1 && condition.right_is_attr == 0 && match_table(selects, condition.left_attr.relation_name, table_name,tableHasCon)) ||  // 左边是属性右边是值
+        (condition.left_is_attr == 0 && condition.right_is_attr == 1 && match_table(selects, condition.right_attr.relation_name, table_name,tableHasCon)) ||  // 左边是值，右边是属性名
         (condition.left_is_attr == 1 && condition.right_is_attr == 1 &&
-            match_table(selects, condition.left_attr.relation_name, table_name) && match_table(selects, condition.right_attr.relation_name, table_name)) // 左右都是属性名，并且表名都符合
+            match_table(selects, condition.left_attr.relation_name, table_name,tableHasCon) && match_table(selects, condition.right_attr.relation_name, table_name,tableHasCon)) // 左右都是属性名，并且表名都符合
         ) {
       DefaultConditionFilter *condition_filter = new DefaultConditionFilter();
       RC rc = condition_filter->init(*table, condition);
@@ -500,7 +573,7 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
       condition_filters.push_back(condition_filter);
     }//TODO: add join 需要将跨表的属性列加到最终获取的列上
     else if(condition.left_is_attr == 1 && condition.right_is_attr == 1 &&
-            match_table(selects, condition.left_attr.relation_name, table_name))//左右都是属性值,但只有左属性值属于当前表
+            match_table(selects, condition.left_attr.relation_name, table_name,tableHasCon))//左右都是属性值,但只有左属性值属于当前表
             {
               Table * table_right = DefaultHandler::get_default().find_table(db, condition.right_attr.relation_name);
               ////如果左右属性类型不同返回fasle
@@ -508,7 +581,7 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
                 return RC::SCHEMA_FIELD_TYPE_MISMATCH;
               }
               schema_add_field(table,condition.left_attr.attribute_name,schema);
-    }else if(match_table(selects, condition.right_attr.relation_name, table_name)){//左右都是属性值,但只有右属性值属于当前表
+    }else if(match_table(selects, condition.right_attr.relation_name, table_name,tableHasCon)){//左右都是属性值,但只有右属性值属于当前表
         Table * table_left = DefaultHandler::get_default().find_table(db, condition.left_attr.relation_name);
         if(!isRightCmp(*table_left,*table,condition)){
           return RC::SCHEMA_FIELD_TYPE_MISMATCH;
@@ -516,6 +589,5 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
         schema_add_field(table,condition.right_attr.attribute_name,schema);
     }
   }
-  
   return select_node.init(trx, table, std::move(schema), std::move(condition_filters));
 }

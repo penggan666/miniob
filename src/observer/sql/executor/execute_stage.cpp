@@ -412,20 +412,23 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
     Tuple tuple;
     TupleSchema tupleSchema;
     std::vector<TupleField> tuple_fileds=tuple_sets.front().get_schema().fields();
+    int count_star_flag=1;
     for(int i=0;i<tuple_fileds.size();i++){
         switch (tuple_fileds[i].aggregate_name()) {
             case AGG_MIN:{
                 std::string const &min_field_name =
                         std::string("min(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
                 tupleSchema.add(tuple_fileds[i].type(), tuple_fileds[i].table_name(), min_field_name.c_str(), AGG_MIN);
-                tuple.add(tuple_sets.front().minTuple(i)[i]);
+                if (tuple_sets.front().size()>0)
+                    tuple.add(tuple_sets.front().minTuple(i)[i]);
             }
                 break;
             case AGG_MAX: {
                 std::string const &max_field_name =
                         std::string("max(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
                 tupleSchema.add(tuple_fileds[i].type(), tuple_fileds[i].table_name(), max_field_name.c_str(), AGG_MAX);
-                tuple.add(tuple_sets.front().maxTuple(i)[i]);
+                if (tuple_sets.front().size()>0)
+                    tuple.add(tuple_sets.front().maxTuple(i)[i]);
             }
                 break;
             case AGG_COUNT:{
@@ -435,19 +438,29 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
                 tuple.add(tuple_sets.front().countTuple());
             }
                 break;
+            case AGG_COUNT_STAR:{
+                if (count_star_flag) {
+                    tupleSchema.add(INTS, tuple_fileds[i].table_name(), "count(*)", AGG_COUNT);
+                    tuple.add(tuple_sets.front().countTuple());
+                    count_star_flag=0;
+                }
+            }
+                break;
             case AGG_AVG:{
                 std::string const &avg_field_name =
                         std::string("avg(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
                 tupleSchema.add(FLOATS, tuple_fileds[i].table_name(), avg_field_name.c_str(), AGG_AVG);
-                tuple.add(tuple_sets.front().avgTuple(i));
+                if (tuple_sets.front().size()>0)
+                    tuple.add(tuple_sets.front().avgTuple(i));
             }
             case AGG_NO:
                 break;
         }
     }
-    if (tuple.size()!=0){
+    if (tupleSchema.fields().size()!=0){
         TupleSet tupleSet;
-        tupleSet.add(std::move(tuple));
+        if (tuple.size()>0)
+            tupleSet.add(std::move(tuple));
         tupleSet.set_schema(tupleSchema);
         tupleSet.print(ss, 0);
     }else {
@@ -517,7 +530,8 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
       if (0 == strcmp("*", attr.attribute_name)) {
         // 列出这张表所有字段
         TupleSchema::from_table(table, schema, attr.aggregate_name);
-        break; // 没有校验，给出* 之后，再写字段的错误
+        if (attr.aggregate_name == AGG_NO)
+            break; // 没有校验，给出* 之后，再写字段的错误
       } else {
         // 列出这张表相关字段
         RC rc = schema_add_field(table, attr.attribute_name, schema, attr.aggregate_name);

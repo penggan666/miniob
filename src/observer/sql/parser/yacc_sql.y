@@ -386,7 +386,7 @@ select_attr:
 	//TODO: 添加对聚合函数的解析
 	| COUNT LBRACE STAR RBRACE agg_list{// add COUNT(*)
 			RelAttr attr;
-			relation_attr_init(&attr, NULL, "*", 1);
+			relation_attr_init(&attr, NULL, "*", 5);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	}
 
@@ -462,7 +462,7 @@ agg_list:
 	/* empty */
 	| COMMA COUNT LBRACE STAR RBRACE{// add COUNT(*)
 			RelAttr attr;
-			relation_attr_init(&attr, NULL, "*", 1);
+			relation_attr_init(&attr, NULL, "*", 5);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	}
 

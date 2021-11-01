@@ -36,7 +36,8 @@ typedef enum {
     AGG_COUNT,
     AGG_MAX,
     AGG_MIN,
-    AGG_AVG
+    AGG_AVG,
+    AGG_COUNT_STAR
 }AggType;
 
 typedef enum {

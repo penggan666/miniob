@@ -118,7 +118,7 @@ void SessionStage::callback_event(StageEvent *event, CallbackContext *context) {
     len = strlen(response) + 1;
   }
   if(strstr(response,"Failed to parse sql") != NULL){
-      response = "FAILURE\n";
+    response = "FAILURE\n";
   }
   Server::send(sev->get_client(), response, len);
 	if ('\0' != response[len - 1]) {

@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <string>
 #include <ostream>
+#include <iomanip>
 
 class TupleValue {
 public:
@@ -27,6 +28,7 @@ public:
 
   virtual void to_string(std::ostream &os) const = 0;
   virtual int compare(const TupleValue &other) const = 0;
+  virtual void get_value(float &value) const=0;
 private:
 };
 
@@ -44,6 +46,11 @@ public:
     return value_ - int_other.value_;
   }
 
+  void get_value(float &value) const override {
+      value=(float)value_;
+  }
+
+
 private:
   int value_;
 };
@@ -54,7 +61,8 @@ public:
   }
 
   void to_string(std::ostream &os) const override {
-    os << value_;
+    int tmpVaule=value_*100;
+    os << (float)tmpVaule/100;
   }
 
   int compare(const TupleValue &other) const override {
@@ -68,6 +76,11 @@ public:
     }
     return 0;
   }
+
+  void get_value(float &value) const override {
+        value=value_;
+  }
+
 private:
   float value_;
 };
@@ -87,6 +100,11 @@ public:
     const StringValue &string_other = (const StringValue &)other;
     return strcmp(value_.c_str(), string_other.value_.c_str());
   }
+
+  void get_value(float &value) const override {
+      value=0.0;
+  }
+
 private:
   std::string value_;
 };

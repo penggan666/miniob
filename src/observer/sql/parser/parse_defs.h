@@ -27,7 +27,17 @@ See the Mulan PSL v2 for more details. */
 typedef struct {
   char *relation_name;   // relation name (may be NULL) 表名
   char *attribute_name;  // attribute name              属性名
+  //TODO: 为RelAttr添加一个聚合属性
+  int aggregate_name;  //如果有聚合函数的话，就会多一个聚合函数的名称
 } RelAttr;
+
+typedef enum {
+    AGG_NO,
+    AGG_COUNT,
+    AGG_MAX,
+    AGG_MIN,
+    AGG_AVG
+}AggType;
 
 typedef enum {
   EQUAL_TO,     //"="     0
@@ -177,7 +187,7 @@ typedef struct Query {
 extern "C" {
 #endif  // __cplusplus
 
-void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name);
+void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name, int aggregate_name);
 void relation_attr_destroy(RelAttr *relation_attr);
 
 void value_init_integer(Value *value, int v);

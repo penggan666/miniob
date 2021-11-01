@@ -408,7 +408,51 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
     join_left_set.print_rm_tmp(ss,realField);
   } else {
     // 当前只查询一张表，直接返回结果即可
-    tuple_sets.front().print(ss);
+    //TODO: 这里添加对聚合函数的处理,目前只做一张表的
+    Tuple tuple;
+    TupleSchema tupleSchema;
+    std::vector<TupleField> tuple_fileds=tuple_sets.front().get_schema().fields();
+    for(int i=0;i<tuple_fileds.size();i++){
+        switch (tuple_fileds[i].aggregate_name()) {
+            case AGG_MIN:{
+                std::string const &min_field_name =
+                        std::string("min(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
+                tupleSchema.add(tuple_fileds[i].type(), tuple_fileds[i].table_name(), min_field_name.c_str(), AGG_MIN);
+                tuple.add(tuple_sets.front().minTuple(i)[i]);
+            }
+                break;
+            case AGG_MAX: {
+                std::string const &max_field_name =
+                        std::string("max(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
+                tupleSchema.add(tuple_fileds[i].type(), tuple_fileds[i].table_name(), max_field_name.c_str(), AGG_MAX);
+                tuple.add(tuple_sets.front().maxTuple(i)[i]);
+            }
+                break;
+            case AGG_COUNT:{
+                std::string const &count_field_name =
+                        std::string("count(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
+                tupleSchema.add(INTS, tuple_fileds[i].table_name(), count_field_name.c_str(), AGG_COUNT);
+                tuple.add(tuple_sets.front().countTuple());
+            }
+                break;
+            case AGG_AVG:{
+                std::string const &avg_field_name =
+                        std::string("avg(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
+                tupleSchema.add(FLOATS, tuple_fileds[i].table_name(), avg_field_name.c_str(), AGG_AVG);
+                tuple.add(tuple_sets.front().avgTuple(i));
+            }
+            case AGG_NO:
+                break;
+        }
+    }
+    if (tuple.size()!=0){
+        TupleSet tupleSet;
+        tupleSet.add(std::move(tuple));
+        tupleSet.set_schema(tupleSchema);
+        tupleSet.print(ss, 0);
+    }else {
+        tuple_sets.front().print(ss, 0);
+    }
   }
 
   for (SelectExeNode *& tmp_node: select_nodes) {
@@ -427,18 +471,24 @@ bool match_table(const Selects &selects, const char *table_name_in_condition, co
   return selects.relation_num == 1;
 }
 
-static RC schema_add_field(Table *table, const char *field_name, TupleSchema &schema) {
+static RC schema_add_field(Table *table, const char *field_name, TupleSchema &schema, int aggregate_name=0) {
   const FieldMeta *field_meta = table->table_meta().field(field_name);
   if (nullptr == field_meta) {
     LOG_WARN("No such field. %s.%s", table->name(), field_name);
     return RC::SCHEMA_FIELD_MISSING;
   }
+  //TODO: 如果AVG的类型是CHARS或者DATES就报错
+  if ((field_meta->type()==CHARS || field_meta->type()==DATES) && aggregate_name==AGG_AVG){
+    LOG_WARN("CHARS OR DATES TYPE DON'T SUPPORT AVG");
+    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  }
 
-  schema.add_if_not_exists(field_meta->type(), table->name(), field_meta->name());
+  schema.add_if_not_exists(field_meta->type(), table->name(), field_meta->name(), aggregate_name);
   return RC::SUCCESS;
 }
-  //TODO:add join 判断两个表中对比属性是否类型相同
-  bool isRightCmp(Table& left_table,Table&right_table,const Condition& condition){
+
+//TODO:add join 判断两个表中对比属性是否类型相同
+bool isRightCmp(Table& left_table,Table&right_table,const Condition& condition){
     AttrType type_left = UNDEFINED;
     AttrType type_right = UNDEFINED;
     const TableMeta &table_meta = left_table.table_meta();
@@ -450,7 +500,7 @@ static RC schema_add_field(Table *table, const char *field_name, TupleSchema &sc
     type_right = field_left2->type();
     if (type_left != type_right) return false;
     return true;
-  }
+}
 // 把所有的表和只跟这张表关联的condition都拿出来，生成最底层的select 执行节点
 RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, SelectExeNode &select_node) {
   // 列出跟这张表关联的Attr
@@ -466,11 +516,11 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
     if (nullptr == attr.relation_name || 0 == strcmp(table_name, attr.relation_name)) {
       if (0 == strcmp("*", attr.attribute_name)) {
         // 列出这张表所有字段
-        TupleSchema::from_table(table, schema);
+        TupleSchema::from_table(table, schema, attr.aggregate_name);
         break; // 没有校验，给出* 之后，再写字段的错误
       } else {
         // 列出这张表相关字段
-        RC rc = schema_add_field(table, attr.attribute_name, schema);
+        RC rc = schema_add_field(table, attr.attribute_name, schema, attr.aggregate_name);
         if (rc != RC::SUCCESS) {
           return rc;
         }

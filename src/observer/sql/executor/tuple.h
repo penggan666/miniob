@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <memory>
 #include <vector>
+#include <algorithm>
 
 #include "sql/parser/parse.h"
 #include "sql/executor/value.h"
@@ -62,8 +63,8 @@ private:
 
 class TupleField {
 public:
-  TupleField(AttrType type, const char *table_name, const char *field_name) :
-          type_(type), table_name_(table_name), field_name_(field_name){
+  TupleField(AttrType type, const char *table_name, const char *field_name, int aggregate_name) :
+          type_(type), table_name_(table_name), field_name_(field_name), aggregate_name_(aggregate_name){
   }
 
   AttrType  type() const{
@@ -76,12 +77,16 @@ public:
   const char *field_name() const {
     return field_name_.c_str();
   }
+  const int aggregate_name() const{
+      return aggregate_name_;
+  }
 
   std::string to_string() const;
 private:
   AttrType  type_;
   std::string table_name_;
   std::string field_name_;
+  int aggregate_name_;
 };
 
 class TupleSchema {
@@ -89,8 +94,8 @@ public:
   TupleSchema() = default;
   ~TupleSchema() = default;
 
-  void add(AttrType type, const char *table_name, const char *field_name);
-  void add_if_not_exists(AttrType type, const char *table_name, const char *field_name);
+  void add(AttrType type, const char *table_name, const char *field_name, int aggregate_name);
+  void add_if_not_exists(AttrType type, const char *table_name, const char *field_name, int aggregate_name);
   bool add_if_not_exists_for_join(AttrType type, const char *table_name, const char *field_name);
   // void merge(const TupleSchema &other);
   void append(const TupleSchema &other);
@@ -111,7 +116,7 @@ public:
   void print(std::ostream &os) const;
   void print_rm_tmp(std::ostream &os,std::vector<int>& tmp_column) const;
 public:
-  static void from_table(const Table *table, TupleSchema &schema);
+  static void from_table(const Table *table, TupleSchema &schema, int aggregate_name);
 private:
   std::vector<TupleField> fields_;
 };
@@ -134,12 +139,23 @@ public:
 
   void clear();
 
+  //TODO: 根据某一个属性列对tuple进行排序
+  void sortTuple(int i);
+  //TODO: 取tuple某列的最大值
+  const std::vector<std::shared_ptr<TupleValue>> maxTuple(int i);
+  //TODO: 取tuple某列的最小值
+  const std::vector<std::shared_ptr<TupleValue>> minTuple(int i);
+  //TODO: 取tuple的某列的平均值
+  float avgTuple(int i);
+  //TODO: 取tuple的数量
+  int countTuple();
+
   bool is_empty() const;
   int size() const;
   const Tuple &get(int index) const;
   const std::vector<Tuple> &tuples() const;
 
-  void print(std::ostream &os) const;
+  void print(std::ostream &os, float d) const;
   void print_rm_tmp(std::ostream &os,std::vector<int>& real_column) const;
 public:
   const TupleSchema &schema() const {

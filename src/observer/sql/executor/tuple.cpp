@@ -65,31 +65,32 @@ std::string TupleField::to_string() const {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void TupleSchema::from_table(const Table *table, TupleSchema &schema) {
+void TupleSchema::from_table(const Table *table, TupleSchema &schema, int aggregate_name) {
   const char *table_name = table->name();
   const TableMeta &table_meta = table->table_meta();
   const int field_num = table_meta.field_num();
   for (int i = 0; i < field_num; i++) {
     const FieldMeta *field_meta = table_meta.field(i);
     if (field_meta->visible()) {
-      schema.add(field_meta->type(), table_name, field_meta->name());
+      schema.add(field_meta->type(), table_name, field_meta->name(),aggregate_name);
     }
   }
 }
 
-void TupleSchema::add(AttrType type, const char *table_name, const char *field_name) {
-  fields_.emplace_back(type, table_name, field_name);
+void TupleSchema::add(AttrType type, const char *table_name, const char *field_name, int aggregate_name) {
+  fields_.emplace_back(type, table_name, field_name, aggregate_name);
 }
 
-void TupleSchema::add_if_not_exists(AttrType type, const char *table_name, const char *field_name) {
+void TupleSchema::add_if_not_exists(AttrType type, const char *table_name, const char *field_name, int aggregate_name) {
   for (const auto &field: fields_) {
     if (0 == strcmp(field.table_name(), table_name) &&
-        0 == strcmp(field.field_name(), field_name)) {
+        0 == strcmp(field.field_name(), field_name) &&
+        field.aggregate_name() == aggregate_name) {
       return;
     }
   }
 
-  add(type, table_name, field_name);
+  add(type, table_name, field_name,aggregate_name);
 }
 //TODO: add join add_if_not_exists_for_join
 bool TupleSchema::add_if_not_exists_for_join(AttrType type, const char *table_name, const char *field_name) {
@@ -100,7 +101,7 @@ bool TupleSchema::add_if_not_exists_for_join(AttrType type, const char *table_na
     }
   }
 
-  add(type, table_name, field_name);
+  //add(type, table_name, field_name);
   return true;
 }
 
@@ -190,7 +191,42 @@ void TupleSet::clear() {
   schema_.clear();
 }
 
-void TupleSet::print(std::ostream &os) const {
+void TupleSet::sortTuple(int i) {
+    std::vector<Tuple> tmpTuples;
+    for (int j=0;j<tuples_.size()-1;j++){
+        for (int k=0;k<tuples_.size()-1-j;k++){
+            if (tuples_[k].get(i).compare(tuples_[k+1].get(i))>0){
+                std::swap(tuples_[k],tuples_[k+1]);
+            }
+        }
+    }
+}
+
+const std::vector<std::shared_ptr<TupleValue>> TupleSet::minTuple(int i) {
+    sortTuple(i);
+    return tuples_.front().values();
+}
+
+const std::vector<std::shared_ptr<TupleValue>> TupleSet::maxTuple(int i) {
+    sortTuple(i);
+    return tuples_.back().values();
+}
+
+int TupleSet::countTuple() {
+    return tuples_.size();
+}
+
+float TupleSet::avgTuple(int i) {
+    float sum=0;
+    float value=0;
+    for (int j=0;j<tuples_.size();j++){
+        tuples_[j].get(i).get_value(value);
+        sum+=value;
+    }
+    return sum/tuples_.size();
+}
+
+void TupleSet::print(std::ostream &os, float d) const {
   if (schema_.fields().empty()) {
     LOG_WARN("Got empty schema");
     return;

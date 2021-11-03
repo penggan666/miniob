@@ -157,7 +157,7 @@ public:
   const Tuple &get(int index) const;
   const std::vector<Tuple> &tuples() const;
 
-  void print(std::ostream &os, float d) const;
+  void print(std::ostream &os) const;
   void print_rm_tmp(std::ostream &os,std::vector<int>& real_column) const;
 public:
   const TupleSchema &schema() const {

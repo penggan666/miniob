@@ -248,7 +248,7 @@ float TupleSet::avgTuple(int i) {
     return sum/tuples_.size();
 }
 
-void TupleSet::print(std::ostream &os, float d) const {
+void TupleSet::print(std::ostream &os) const {
   if (schema_.fields().empty()) {
     LOG_WARN("Got empty schema");
     return;

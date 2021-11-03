@@ -107,7 +107,11 @@ ParserContext *get_context(yyscan_t scanner)
         LE
         GE
         NE
-
+		ORDER
+		BY
+		ASC
+		INNER
+		JOIN
 %union {
   struct _Attr *attr;
   struct _Condition *condition1;
@@ -350,7 +354,7 @@ update:			/*  update 语句的语法解析树*/
 		}
     ;
 select:				/*  select 语句的语法解析树*/
-    SELECT select_attr FROM ID rel_list where SEMICOLON
+    SELECT select_attr FROM ID rel_list where order SEMICOLON
 		{
 			// CONTEXT->ssql->sstr.selection.relations[CONTEXT->from_length++]=$4;
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
@@ -365,6 +369,78 @@ select:				/*  select 语句的语法解析树*/
 			CONTEXT->from_length=0;
 			CONTEXT->select_length=0;
 			CONTEXT->value_length = 0;
+	}
+	;
+
+order:
+	/* empty */
+	| ORDER BY order_attr{
+	//TODO: add order 
+	}
+	;
+order_attr:
+	ID order_list{
+		OrderAttr attr;
+		order_attr_init(&attr,NULL,$1,OASC);
+		selects_append_order(&CONTEXT->ssql->sstr.selection,&attr);
+	}
+	| ID DOT ID order_list{
+		OrderAttr attr;
+		order_attr_init(&attr,$1,$3,OASC);
+		selects_append_order(&CONTEXT->ssql->sstr.selection,&attr);
+	}
+	|ID ASC order_list{
+		OrderAttr attr;
+		order_attr_init(&attr,NULL,$1,OASC);
+		selects_append_order(&CONTEXT->ssql->sstr.selection,&attr);
+	}
+	|ID DOT ID ASC order_list{
+		OrderAttr attr;
+		order_attr_init(&attr,$1,$3,OASC);
+		selects_append_order(&CONTEXT->ssql->sstr.selection,&attr);
+	}
+	|ID DESC order_list{
+		OrderAttr attr;
+		order_attr_init(&attr,NULL,$1,ODESC);
+		selects_append_order(&CONTEXT->ssql->sstr.selection,&attr);
+	}
+	|ID DOT ID DESC order_list{
+		OrderAttr attr;
+		order_attr_init(&attr,$1,$3,ODESC);
+		selects_append_order(&CONTEXT->ssql->sstr.selection,&attr);
+	}
+	;
+order_list:
+	/* empty */
+	| COMMA ID order_list{
+		OrderAttr attr;
+		order_attr_init(&attr,NULL,$2,OASC);
+		selects_append_order(&CONTEXT->ssql->sstr.selection,&attr);
+	}
+	| COMMA ID DOT ID order_list{
+		OrderAttr attr;
+		order_attr_init(&attr,$2,$4,OASC);
+		selects_append_order(&CONTEXT->ssql->sstr.selection,&attr);
+	}
+	| COMMA ID ASC order_list{
+		OrderAttr attr;
+		order_attr_init(&attr,NULL,$2,OASC);
+		selects_append_order(&CONTEXT->ssql->sstr.selection,&attr);
+	}
+	| COMMA ID DOT ID ASC order_list{
+		OrderAttr attr;
+		order_attr_init(&attr,$2,$4,OASC);
+		selects_append_order(&CONTEXT->ssql->sstr.selection,&attr);
+	}
+	| COMMA ID DESC order_list{
+		OrderAttr attr;
+		order_attr_init(&attr,NULL,$2,ODESC);
+		selects_append_order(&CONTEXT->ssql->sstr.selection,&attr);
+	}
+	| COMMA ID DOT ID DESC order_list{
+		OrderAttr attr;
+		order_attr_init(&attr,$2,$4,ODESC);
+		selects_append_order(&CONTEXT->ssql->sstr.selection,&attr);
 	}
 	;
 
@@ -528,7 +604,16 @@ rel_list:
     | COMMA ID rel_list {	
 				selects_append_relation(&CONTEXT->ssql->sstr.selection, $2);
 		  }
+	| INNER JOIN ID join_on rel_list{//TODO: add inner join
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $3);
+	}
     ;
+join_on:
+	/* empty */
+	| ON condition condition_list{//TODO: add inner join
+
+	}
+;
 where:
     /* empty */ 
     | WHERE condition condition_list {	

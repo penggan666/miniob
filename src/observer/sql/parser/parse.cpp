@@ -31,7 +31,16 @@ void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const
   relation_attr->aggregate_name = aggregate_name;
   relation_attr->attribute_name = strdup(attribute_name);
 }
-
+//TODO: add order order_attr_init
+void order_attr_init(OrderAttr *order_attr, const char *relation_name, const char *attribute_name, OrderType order_type) {
+  if (relation_name != nullptr) {
+    order_attr->relation_name = strdup(relation_name);
+  } else {
+    order_attr->relation_name = nullptr;
+  }
+  order_attr->type = order_type;
+  order_attr->attribute_name = strdup(attribute_name);
+}
 void relation_attr_destroy(RelAttr *relation_attr) {
   free(relation_attr->relation_name);
   free(relation_attr->attribute_name);
@@ -103,6 +112,10 @@ void attr_info_destroy(AttrInfo *attr_info) {
 void selects_init(Selects *selects, ...);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr) {
   selects->attributes[selects->attr_num++] = *rel_attr;
+}
+//TODO: add order selects_append_order
+void selects_append_order(Selects *selects, OrderAttr *order_attr) {
+  selects->orderattrs[selects->order_num++] = *order_attr;
 }
 void selects_append_relation(Selects *selects, const char *relation_name) {
   selects->relations[selects->relation_num++] = strdup(relation_name);

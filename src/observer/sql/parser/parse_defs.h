@@ -49,6 +49,13 @@ typedef enum {
   GREAT_THAN,   //">"     5
   NO_OP
 } CompOp;
+//TODO: add order struct OrderAttr
+typedef enum {OASC,ODESC} OrderType;
+typedef struct {
+  char *relation_name;   // relation name (may be NULL) 表名
+  char *attribute_name;  // attribute name              属性名
+  OrderType type; //升序 ASC 降序 DESC 
+} OrderAttr;
 
 //属性值类型
 typedef enum { UNDEFINED, CHARS, INTS, FLOATS, DATES } AttrType;
@@ -79,6 +86,9 @@ typedef struct {
   char *    relations[MAX_NUM];     // relations in From clause
   size_t    condition_num;          // Length of conditions in Where clause
   Condition conditions[MAX_NUM];    // conditions in Where clause
+  //TODO: add order struct Selects
+  size_t    order_num;
+  OrderAttr orderattrs[MAX_NUM];
 } Selects;
 
 // struct of insert

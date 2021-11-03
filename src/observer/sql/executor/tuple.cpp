@@ -192,7 +192,6 @@ void TupleSet::clear() {
 }
 
 void TupleSet::sortTuple(int i) {
-    std::vector<Tuple> tmpTuples;
     for (int j=0;j<tuples_.size()-1;j++){
         for (int k=0;k<tuples_.size()-1-j;k++){
             if (tuples_[k].get(i).compare(tuples_[k+1].get(i))>0){
@@ -201,7 +200,30 @@ void TupleSet::sortTuple(int i) {
         }
     }
 }
-
+int compare_AscOrDesc(const TupleValue& left,const TupleValue& right,bool isAsc){
+    if(isAsc){
+        return left.compare(right);
+    }else{
+        return -left.compare(right);
+    }
+}
+void TupleSet::sortTupleByOrder(const std::vector<int> &fieldIndex, const std::vector<bool> & isAsc){
+  for (int j=0;j<tuples_.size()-1;j++){
+        for (int k=0;k<tuples_.size()-1-j;k++){
+            Tuple& left=tuples_[k];
+            Tuple& right=tuples_[k+1];
+            for(size_t i=0;i<fieldIndex.size();i++){
+                int fi=fieldIndex[i];
+                int res=compare_AscOrDesc(left.get(fi),right.get(fi),isAsc[i]);
+                if(res==0)continue;
+                if(res>0){
+                    std::swap(left,right);
+                }
+                break;
+            }
+        }
+    }
+}
 const std::vector<std::shared_ptr<TupleValue>> TupleSet::minTuple(int i) {
     sortTuple(i);
     return tuples_.front().values();

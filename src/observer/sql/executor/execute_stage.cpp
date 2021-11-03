@@ -332,6 +332,46 @@ void getPrintIndex(const Selects &selects,const std::vector<TupleField> &fields,
     }
   }
 }
+//TODO: add order 根据字段名获取对应的表名 一般用于字段表属性是NULL时, 注意如果返回多个表说明存在问题
+int getTableNameByField(const char *db,const Selects &selects,char*& res_table_name,const char* field_name){
+    int count=0;
+    for (size_t i = 0; i < selects.relation_num; i++) {
+    const char *table_name = selects.relations[i];
+    Table * table = DefaultHandler::get_default().find_table(db, table_name);
+    const TableMeta &table_meta = table->table_meta();
+    const int field_num = table_meta.field_num();
+    for (int j = 0; j < field_num; j++) {
+    const FieldMeta *field_meta = table_meta.field(j);
+    if (field_meta->visible()) {
+      if(strcmp(field_meta->name(),field_name)){
+        res_table_name=strdup(table_name);
+        count++;
+      }
+    }
+    }
+  }
+  return count;
+}
+
+//TODO: add order
+void init_orderby(const char *db,const Selects &selects,const TupleSet& ts,std::vector<int>&order_field_indexs,std::vector<bool>& is_asc){
+  
+  const TupleSchema & schema=ts.get_schema();
+  for(int i=selects.order_num-1;i>=0;i--){//遍历每个order
+    const OrderAttr& oa=selects.orderattrs[i];
+    char*  relation_name=nullptr;
+    char*  attr_name=strdup(oa.attribute_name);
+    if(nullptr==oa.relation_name){
+      getTableNameByField(db,selects,relation_name,attr_name);//将空的表名填补上
+    }else{
+      relation_name=strdup(oa.relation_name);
+    }
+    //遍历tuple field 找对应index
+    order_field_indexs.push_back(schema.index_of_field(relation_name,attr_name));
+    is_asc.push_back(oa.type==OASC);
+  }
+
+}
 // 这里没有对输入的某些信息做合法性校验，比如查询的列名、where条件中的列名等，没有做必要的合法性校验
 // 需要补充上这一部分. 校验部分也可以放在resolve，不过跟execution放一起也没有关系
 RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_event) {
@@ -383,6 +423,9 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   }
 
   std::stringstream ss;
+  //TODO: add order 根据select里order属性 获取对应属性在结果Tuple的index和排序方式(ASC或DESC)
+  std::vector<int> order_field_indexs;
+  std::vector<bool> is_asc;
   if (tuple_sets.size() > 1) {
     //TODO: add join 对tuple进行join操作
     // //初始化schema
@@ -405,6 +448,12 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
     }
     std::vector<int> realField;
     getPrintIndex(selects,join_left_set.get_schema().fields(),realField);
+    //TODO: add order 如果order条件个数大于0, 需要先排序在输出
+    if(selects.order_num>0){
+      init_orderby(db,selects,join_left_set,order_field_indexs,is_asc);
+      join_left_set.sortTupleByOrder(order_field_indexs,is_asc);
+    }
+    
     join_left_set.print_rm_tmp(ss,realField);
   } else {
     // 当前只查询一张表，直接返回结果即可
@@ -462,8 +511,16 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
         if (tuple.size()>0)
             tupleSet.add(std::move(tuple));
         tupleSet.set_schema(tupleSchema);
+        // if(selects.order_num>0){
+        //   init_orderby(db,selects,tupleSet,order_field_indexs,is_asc);
+        //   tupleSet.sortTupleByOrder(order_field_indexs,is_asc);
+        // }
         tupleSet.print(ss, 0);
     }else {
+        if(selects.order_num>0){
+          init_orderby(db,selects,tuple_sets.front(),order_field_indexs,is_asc);
+          tuple_sets.front().sortTupleByOrder(order_field_indexs,is_asc);
+        }
         tuple_sets.front().print(ss, 0);
     }
   }

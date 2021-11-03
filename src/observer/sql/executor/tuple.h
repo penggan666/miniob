@@ -150,6 +150,8 @@ public:
   //TODO: 取tuple的数量
   int countTuple();
 
+  //TODO: add order 根据多列进行排序
+  void sortTupleByOrder(const std::vector<int> &fieldIndex, const std::vector<bool> & isAsc);
   bool is_empty() const;
   int size() const;
   const Tuple &get(int index) const;

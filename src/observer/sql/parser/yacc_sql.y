@@ -110,7 +110,8 @@ ParserContext *get_context(yyscan_t scanner)
 		ORDER
 		BY
 		ASC
-
+		INNER
+		JOIN
 %union {
   struct _Attr *attr;
   struct _Condition *condition1;
@@ -595,7 +596,16 @@ rel_list:
     | COMMA ID rel_list {	
 				selects_append_relation(&CONTEXT->ssql->sstr.selection, $2);
 		  }
+	| INNER JOIN ID join_on rel_list{//TODO: add inner join
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $3);
+	}
     ;
+join_on:
+	/* empty */
+	| ON condition condition_list{//TODO: add inner join
+
+	}
+;
 where:
     /* empty */ 
     | WHERE condition condition_list {	

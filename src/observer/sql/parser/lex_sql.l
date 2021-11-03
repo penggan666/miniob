@@ -79,6 +79,8 @@ QUOTE            [\'\"]
 [Oo][Rr][Dd][Ee][Rr]					 RETURN_TOKEN(ORDER);//TODO: add order
 [Bb][Yy]                                 RETURN_TOKEN(BY);
 [Aa][Ss][Cc]							 RETURN_TOKEN(ASC);
+[Ii][Nn][Nn][Ee][Rr]					 RETURN_TOKEN(INNER);//TODO: add inner join
+[Jj][Oo][Ii][Nn]                         RETURN_TOKEN(JOIN);
 {ID}							                       yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "("								                       RETURN_TOKEN(LBRACE);
 ")"								                       RETURN_TOKEN(RBRACE);

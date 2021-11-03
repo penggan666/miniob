@@ -417,7 +417,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
         switch (tuple_fileds[i].aggregate_name()) {
             case AGG_MIN:{
                 std::string const &min_field_name =
-                        std::string("min(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
+                        std::string("MIN(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
                 tupleSchema.add(tuple_fileds[i].type(), tuple_fileds[i].table_name(), min_field_name.c_str(), AGG_MIN);
                 if (tuple_sets.front().size()>0)
                     tuple.add(tuple_sets.front().minTuple(i)[i]);
@@ -425,7 +425,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
                 break;
             case AGG_MAX: {
                 std::string const &max_field_name =
-                        std::string("max(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
+                        std::string("MAX(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
                 tupleSchema.add(tuple_fileds[i].type(), tuple_fileds[i].table_name(), max_field_name.c_str(), AGG_MAX);
                 if (tuple_sets.front().size()>0)
                     tuple.add(tuple_sets.front().maxTuple(i)[i]);
@@ -433,14 +433,14 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
                 break;
             case AGG_COUNT:{
                 std::string const &count_field_name =
-                        std::string("count(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
+                        std::string("COUNT(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
                 tupleSchema.add(INTS, tuple_fileds[i].table_name(), count_field_name.c_str(), AGG_COUNT);
                 tuple.add(tuple_sets.front().countTuple());
             }
                 break;
             case AGG_COUNT_STAR:{
                 if (count_star_flag) {
-                    tupleSchema.add(INTS, tuple_fileds[i].table_name(), "count(*)", AGG_COUNT);
+                    tupleSchema.add(INTS, tuple_fileds[i].table_name(), "COUNT(*)", AGG_COUNT);
                     tuple.add(tuple_sets.front().countTuple());
                     count_star_flag=0;
                 }
@@ -448,7 +448,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
                 break;
             case AGG_AVG:{
                 std::string const &avg_field_name =
-                        std::string("avg(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
+                        std::string("AVG(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
                 tupleSchema.add(FLOATS, tuple_fileds[i].table_name(), avg_field_name.c_str(), AGG_AVG);
                 if (tuple_sets.front().size()>0)
                     tuple.add(tuple_sets.front().avgTuple(i));
@@ -462,9 +462,9 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
         if (tuple.size()>0)
             tupleSet.add(std::move(tuple));
         tupleSet.set_schema(tupleSchema);
-        tupleSet.print(ss, 0);
+        tupleSet.print(ss);
     }else {
-        tuple_sets.front().print(ss, 0);
+        tuple_sets.front().print(ss);
     }
   }
 

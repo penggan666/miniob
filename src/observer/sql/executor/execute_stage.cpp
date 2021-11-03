@@ -375,6 +375,7 @@ void init_orderby(const char *db,const Selects &selects,const TupleSet& ts,std::
 // 这里没有对输入的某些信息做合法性校验，比如查询的列名、where条件中的列名等，没有做必要的合法性校验
 // 需要补充上这一部分. 校验部分也可以放在resolve，不过跟execution放一起也没有关系
 RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_event) {
+  
   RC rc = RC::SUCCESS;
   Session *session = session_event->get_client()->session;
   Trx *trx = session->current_trx();
@@ -387,6 +388,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
     rc = create_selection_executor(trx, selects, db, table_name, *select_node);
     
     if (rc != RC::SUCCESS) {
+      LOG_ERROR("create_selection_executor fail!!!\n");
       session_event->set_response("FAILURE\n");
       delete select_node;
       for (SelectExeNode *& tmp_node: select_nodes) {
@@ -588,6 +590,7 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
         // 列出这张表相关字段
         RC rc = schema_add_field(table, attr.attribute_name, schema, attr.aggregate_name);
         if (rc != RC::SUCCESS) {
+          LOG_ERROR("schema_add_field fail!!!\n");
           return rc;
         }
       }
@@ -611,6 +614,7 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
         for (DefaultConditionFilter * &filter : condition_filters) {
           delete filter;
         }
+        LOG_ERROR("condition_filter init fail!!!\n");
         return rc;
       }
       condition_filters.push_back(condition_filter);
@@ -621,12 +625,15 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
               Table * table_right = DefaultHandler::get_default().find_table(db, condition.right_attr.relation_name);
               ////如果左右属性类型不同返回fasle
               if(!isRightCmp(*table,*table_right,condition)){
+                LOG_ERROR("left isRightCmp fail!!!\n");
                 return RC::SCHEMA_FIELD_TYPE_MISMATCH;
               }
               schema_add_field(table,condition.left_attr.attribute_name,schema);
-    }else if(match_table(selects, condition.right_attr.relation_name, table_name)){//左右都是属性值,但只有右属性值属于当前表
+    }else if(condition.left_is_attr == 1 && condition.right_is_attr == 1 &&
+    match_table(selects, condition.right_attr.relation_name, table_name)){//左右都是属性值,但只有右属性值属于当前表
         Table * table_left = DefaultHandler::get_default().find_table(db, condition.left_attr.relation_name);
         if(!isRightCmp(*table_left,*table,condition)){
+          LOG_ERROR("right isRightCmp fail!!! %s-%s-%d\n",condition.right_attr.attribute_name,condition.left_attr.attribute_name,condition.comp);
           return RC::SCHEMA_FIELD_TYPE_MISMATCH;
         }
         schema_add_field(table,condition.right_attr.attribute_name,schema);

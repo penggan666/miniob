@@ -118,6 +118,7 @@ void SessionStage::callback_event(StageEvent *event, CallbackContext *context) {
     len = strlen(response) + 1;
   }
   if(strstr(response,"Failed to parse sql") != NULL){
+    printf("Failed to parse sql\n");
     response = "FAILURE\n";
     len = strlen(response) + 1;
   }

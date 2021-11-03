@@ -90,7 +90,7 @@ private:
   RC delete_entry_of_indexes(const char *record, const RID &rid, bool error_on_not_exists);
 private:
   RC init_record_handler(const char *base_dir);
-  RC make_record(int value_num, const Value *values, char * &record_out);
+  RC make_record(int value_num, const Value *values, char ** &record_out);
 
 private:
   Index *find_index(const char *index_name) const;

@@ -234,17 +234,24 @@ RC Table::insert_record(Trx *trx, int value_num, const Value *values) {
     return RC::INVALID_ARGUMENT;
   }
 
-  char *record_data;
+  char **record_data;
   RC rc = make_record(value_num, values, record_data);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to create a record. rc=%d:%s", rc, strrc(rc));
     return rc;
   }
 
-  Record record;
-  record.data = record_data;
-  // record.valid = true;
-  rc = insert_record(trx, &record);
+
+  for (int i=0;i<value_num/(table_meta_.field_num()-table_meta_.sys_field_num());i++) {
+      printf("%d\n",i);
+      Record record;
+      record.data = record_data[i];
+      // record.valid = true;
+      rc = insert_record(trx, &record);
+  }
+  for (int i=0;i<value_num/(table_meta_.field_num()-table_meta_.sys_field_num());i++){
+      delete [] record_data[i];
+  }
   delete[] record_data;
   return rc;
 }
@@ -258,16 +265,18 @@ const TableMeta &Table::table_meta() const {
 }
 
 
-RC Table::make_record(int value_num, const Value *values, char * &record_out) {
+RC Table::make_record(int value_num, const Value *values, char ** &record_out) {
   // 检查字段类型是否一致
-  if (value_num + table_meta_.sys_field_num() != table_meta_.field_num()) {
-    return RC::SCHEMA_FIELD_MISSING;
+  // TODO:加入对批量插入的处理
+  int table_meta_value_num=table_meta_.field_num()-table_meta_.sys_field_num();
+  if (value_num % table_meta_value_num != 0){
+      return RC::SCHEMA_FIELD_MISSING;
   }
 
   const int normal_field_start_index = table_meta_.sys_field_num();
   std::map<int,int> map_date;//用于记录遇到的date值, 因为传入的value不能修改, 只能在检查阶段记录下来
   for (int i = 0; i < value_num; i++) {
-    const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
+    const FieldMeta *field = table_meta_.field(i % table_meta_value_num + normal_field_start_index);
     const Value &value = values[i];
     if (field->type() != value.type) {
       //TODO: add date when insert date
@@ -284,19 +293,27 @@ RC Table::make_record(int value_num, const Value *values, char * &record_out) {
 
   // 复制所有字段的值
   int record_size = table_meta_.record_size();
-  char *record = new char [record_size];
+  char **record;
+  record = new char *[value_num/table_meta_value_num];
+  for (int i=0;i<value_num/table_meta_value_num;i++){
+      record[i] = new char [record_size];
+  }
+
+  //char *record = new char [record_size];
 
   for (int i = 0; i < value_num; i++) {
     //TODO: add date date按照int存储
     std::map<int, int>::iterator iter;
     if((iter=map_date.find(i))!=map_date.end()){
       int date_i=iter->second;
-      const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
-      memcpy(record + field->offset(),&date_i, field->len());
+      const FieldMeta *field = table_meta_.field(i % table_meta_value_num + normal_field_start_index);
+      memcpy(record[i / table_meta_value_num] + field->offset(),&date_i, field->len());
+      printf("%d\n",date_i);
     }else{
-      const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
+      const FieldMeta *field = table_meta_.field(i % table_meta_value_num + normal_field_start_index);
       const Value &value = values[i];
-      memcpy(record + field->offset(), value.data, field->len());
+      memcpy(record[i / table_meta_value_num] + field->offset(), value.data, field->len());
+      printf("%d\n",value.data);
     }
   }
 

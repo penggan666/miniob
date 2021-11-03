@@ -592,14 +592,22 @@ agg_list:
 	;
 
 rel_list:
-    /* empty */
-    | COMMA ID rel_list {	
+/* empty */
+| table_factor {	
+		}
+| join_table{//TODO: add inner join
+}
+;
+table_factor:
+	COMMA ID rel_list {	
 				selects_append_relation(&CONTEXT->ssql->sstr.selection, $2);
-		  }
-	| INNER JOIN ID join_on rel_list{//TODO: add inner join
+	}
+	;
+join_table:
+	INNER JOIN ID join_on rel_list{//TODO: add inner join
 		selects_append_relation(&CONTEXT->ssql->sstr.selection, $3);
 	}
-    ;
+;
 join_on:
 	/* empty */
 	| ON condition condition_list{//TODO: add inner join

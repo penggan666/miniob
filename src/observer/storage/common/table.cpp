@@ -308,12 +308,10 @@ RC Table::make_record(int value_num, const Value *values, char ** &record_out) {
       int date_i=iter->second;
       const FieldMeta *field = table_meta_.field(i % table_meta_value_num + normal_field_start_index);
       memcpy(record[i / table_meta_value_num] + field->offset(),&date_i, field->len());
-      printf("%d\n",date_i);
     }else{
       const FieldMeta *field = table_meta_.field(i % table_meta_value_num + normal_field_start_index);
       const Value &value = values[i];
       memcpy(record[i / table_meta_value_num] + field->offset(), value.data, field->len());
-      printf("%d\n",value.data);
     }
   }
 

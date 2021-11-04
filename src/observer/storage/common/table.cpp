@@ -243,7 +243,6 @@ RC Table::insert_record(Trx *trx, int value_num, const Value *values) {
 
 
   for (int i=0;i<value_num/(table_meta_.field_num()-table_meta_.sys_field_num());i++) {
-      printf("%d\n",i);
       Record record;
       record.data = record_data[i];
       // record.valid = true;
@@ -474,7 +473,10 @@ static RC insert_index_record_reader_adapter(Record *record, void *context) {
   return inserter.insert_index(record);
 }
 
-RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_name) {
+//TODO: 加上对单列唯一索引的支持，考虑两方面
+//1. 对已有数据列建立索引时，如果数据列有重复数据，那么不能建立索引
+//2. 在插入数据时，如果是重复数据，则不能插入
+RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_name, const int is_unique) {
   if (index_name == nullptr || common::is_blank(index_name) ||
       attribute_name == nullptr || common::is_blank(attribute_name)) {
     return RC::INVALID_ARGUMENT;
@@ -490,7 +492,7 @@ RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_n
   }
 
   IndexMeta new_index_meta;
-  RC rc = new_index_meta.init(index_name, *field_meta);
+  RC rc = new_index_meta.init(index_name, *field_meta, is_unique);
   if (rc != RC::SUCCESS) {
     return rc;
   }

@@ -28,6 +28,7 @@ void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const
   } else {
     relation_attr->relation_name = nullptr;
   }
+  
   relation_attr->aggregate_name = aggregate_name;
   relation_attr->attribute_name = strdup(attribute_name);
 }

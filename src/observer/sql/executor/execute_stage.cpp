@@ -568,6 +568,55 @@ bool isRightCmp(Table& left_table,Table&right_table,const Condition& condition){
     if (type_left != type_right) return false;
     return true;
 }
+//用于比较一开始就是两个值的condition, 如果是true, 该条件可以直接跳过过
+bool cmp_value(const Value& left_value_,const Value& right_value_,const CompOp& comp){
+  char *left_value = (char *)left_value_.data;
+  char *right_value = (char *)right_value_.data;
+  int cmp_result = 0;
+  switch (left_value_.type) {
+    case CHARS: {  // 字符串都是定长的，直接比较
+      // 按照C字符串风格来定
+      cmp_result = strcmp(left_value, right_value);
+    } break;
+    //TODO: add date
+    case DATES:
+    case INTS: {
+      // 没有考虑大小端问题
+      // 对int和float，要考虑字节对齐问题,有些平台下直接转换可能会跪
+      int left = *(int *)left_value;
+      int right = *(int *)right_value;
+      cmp_result = left - right;
+    } break;
+    case FLOATS: {
+      float left = *(float *)left_value;
+      float right = *(float *)right_value;
+      cmp_result = (int)(left - right);
+    } break;
+    default: {
+    }
+  }
+
+  switch (comp) {
+    case EQUAL_TO:
+      return 0 == cmp_result;
+    case LESS_EQUAL:
+      return cmp_result <= 0;
+    case NOT_EQUAL:
+      return cmp_result != 0;
+    case LESS_THAN:
+      return cmp_result < 0;
+    case GREAT_EQUAL:
+      return cmp_result >= 0;
+    case GREAT_THAN:
+      return cmp_result > 0;
+
+    default:
+      break;
+  }
+
+  LOG_PANIC("Never should print this.");
+  return cmp_result;  // should not go here
+}
 // 把所有的表和只跟这张表关联的condition都拿出来，生成最底层的select 执行节点
 RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, SelectExeNode &select_node) {
   // 列出跟这张表关联的Attr
@@ -607,6 +656,7 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
         (condition.left_is_attr == 1 && condition.right_is_attr == 1 &&
             match_table(selects, condition.left_attr.relation_name, table_name) && match_table(selects, condition.right_attr.relation_name, table_name)) // 左右都是属性名，并且表名都符合
         ) {
+      
       DefaultConditionFilter *condition_filter = new DefaultConditionFilter();
       RC rc = condition_filter->init(*table, condition);
       if (rc != RC::SUCCESS) {
@@ -616,6 +666,11 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
         }
         LOG_ERROR("condition_filter init fail!!!\n");
         return rc;
+      }
+      //1=1这种情况直接无视
+      if(condition.left_is_attr == 0 && condition.right_is_attr==0&&cmp_value(condition.left_value,condition.right_value,condition.comp)){
+        LOG_ERROR("jump !!!\n");
+        continue;
       }
       condition_filters.push_back(condition_filter);
     }//TODO: add join 需要将跨表的属性列加到最终获取的列上

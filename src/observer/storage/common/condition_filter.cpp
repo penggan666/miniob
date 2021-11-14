@@ -163,7 +163,7 @@ bool DefaultConditionFilter::filter(const Record &rec) const
             return false;
   }
   if (comp_op_==IS_NOT){
-        if(is_null==1)
+        if(is_null==1 || (left_value == nullptr&&right_value== nullptr))
             return false;
         else
             return true;

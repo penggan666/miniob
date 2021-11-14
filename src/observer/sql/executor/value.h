@@ -40,7 +40,7 @@ public:
 
   void to_string(std::ostream &os) const override {
     if (is_null_==1){
-        os << "null";
+        os << "NULL";
     } else {
         os << value_;
     }
@@ -78,7 +78,7 @@ public:
 
   void to_string(std::ostream &os) const override {
       if (is_null_==1){
-          os << "null";
+          os << "NULL";
       } else {
           int tmpVaule=value_*100;
           os << (float)tmpVaule/100;
@@ -125,7 +125,7 @@ public:
 
   void to_string(std::ostream &os) const override {
       if (is_null_==1){
-          os << "null";
+          os << "NULL";
       } else {
           os << value_;
       }

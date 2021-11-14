@@ -485,13 +485,13 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
                 std::string const &count_field_name =
                         std::string("COUNT(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
                 tupleSchema.add(INTS, tuple_fileds[i].table_name(), count_field_name.c_str(), AGG_COUNT);
-                tuple.add(tuple_sets.front().countTuple());
+                tuple.add(tuple_sets.front().countTupleColumn(i),0);
             }
                 break;
             case AGG_COUNT_STAR:{
                 if (count_star_flag) {
                     tupleSchema.add(INTS, tuple_fileds[i].table_name(), "COUNT(*)", AGG_COUNT);
-                    tuple.add(tuple_sets.front().countTuple());
+                    tuple.add(tuple_sets.front().countTupleStar(),0);
                     count_star_flag=0;
                 }
             }
@@ -500,8 +500,13 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
                 std::string const &avg_field_name =
                         std::string("AVG(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
                 tupleSchema.add(FLOATS, tuple_fileds[i].table_name(), avg_field_name.c_str(), AGG_AVG);
-                if (tuple_sets.front().size()>0)
-                    tuple.add(tuple_sets.front().avgTuple(i));
+                if (tuple_sets.front().size()>0){
+                    float result = tuple_sets.front().avgTuple(i);
+                    if (result==-1)
+                        tuple.add(result,1);
+                    else
+                        tuple.add(result,0);
+                }
             }
             case AGG_NO:
                 break;
@@ -572,6 +577,8 @@ bool isRightCmp(Table& left_table,Table&right_table,const Condition& condition){
 bool cmp_value(const Value& left_value_,const Value& right_value_,const CompOp& comp){
   char *left_value = (char *)left_value_.data;
   char *right_value = (char *)right_value_.data;
+  if(left_value== nullptr || right_value == nullptr)
+      return false;
   int cmp_result = 0;
   switch (left_value_.type) {
     case CHARS: {  // 字符串都是定长的，直接比较

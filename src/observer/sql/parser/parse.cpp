@@ -63,6 +63,10 @@ void value_init_string(Value *value, const char *v) {
   value->type = CHARS;
   value->data = strdup(v);
 }
+void value_init_nullvalue(Value *value) {
+  value->type = UNDEFINED;
+  value->data = nullptr;
+}
 void value_destroy(Value *value) {
   value->type = UNDEFINED;
   free(value->data);
@@ -78,6 +82,7 @@ void condition_init(Condition *condition, CompOp comp,
     condition->left_attr = *left_attr;
   } else {
     condition->left_value = *left_value;
+    printf("%d\n",right_is_attr);
   }
 
   condition->right_is_attr = right_is_attr;
@@ -100,10 +105,11 @@ void condition_destroy(Condition *condition) {
   }
 }
 
-void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length) {
+void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length, int is_null) {
   attr_info->name = strdup(name);
   attr_info->type = type;
   attr_info->length = length;
+  attr_info->is_null = is_null;
 }
 void attr_info_destroy(AttrInfo *attr_info) {
   free(attr_info->name);

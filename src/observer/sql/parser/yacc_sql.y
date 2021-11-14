@@ -754,6 +754,15 @@ condition:
 			// $$->right_attr.attribute_name=$3;
 		
 		}
+	|ISNULL comOp value
+	    {
+			Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
+            Value left_value;
+			value_init_nullvalue(&left_value);
+			Condition condition;
+			condition_init(&condition, CONTEXT->comp, 0, NULL, &left_value, 0, NULL, right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+		}	
 	|value comOp ISNULL
 	    {
 			Value *left_value = &CONTEXT->values[CONTEXT->value_length - 1];
@@ -804,6 +813,16 @@ condition:
 			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 	}
+	|ISNULL comOp ID
+		{
+			RelAttr right_attr;
+			relation_attr_init(&right_attr, NULL, $3, 0);
+			Value left_value;
+			value_init_nullvalue(&left_value);
+			Condition condition;
+			condition_init(&condition, CONTEXT->comp, 0, NULL, &left_value, 1, &right_attr, NULL);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+		}
 	|ID DOT ID comOp ISNULL
 		{
 			RelAttr left_attr;
@@ -814,6 +833,7 @@ condition:
 			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 	}
+
     |value comOp ID DOT ID
 		{
 			Value *left_value = &CONTEXT->values[CONTEXT->value_length - 1];

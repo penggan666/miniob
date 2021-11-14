@@ -42,7 +42,7 @@ DefaultConditionFilter::~DefaultConditionFilter()
 RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType attr_type, CompOp comp_op)
 {
   //TODO: add date
-  if (attr_type < CHARS || attr_type > DATES) {
+  if (attr_type < CHARS || attr_type > ARR_FLOATS) {
     LOG_ERROR("Invalid condition with unsupported attribute type: %d", attr_type);
     return RC::INVALID_ARGUMENT;
   }
@@ -120,20 +120,32 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
   // 但是选手们还是要实现。这个功能在预选赛中会出现
   //TODO: add date 对于date的比较， 应该注意判断比较的type是string， 且string是符合date的情况
   if (type_left != type_right) {
+    
     int date_i;
     if(left.is_attr&&type_left==DATES&&(!right.is_attr)&&type_right==CHARS&&(date_i=dateToInt((char*)right.value))!=-1){
       memcpy(right.value,&date_i, sizeof(date_i));
     }else if((!left.is_attr)&&type_left==CHARS&&right.is_attr&&type_right==DATES&&(date_i=dateToInt((char*)left.value))!=-1){
       memcpy(left.value,&date_i, sizeof(date_i));
-    }else{
+    }//TODO:add join 对多种数组类型增加判断
+    else if(type_left==CHARS&&type_right==ARR_CHARS){
+      type_left=ARR_CHARS;
+    }else if(type_left==INTS&&type_right==ARR_INTS){
+      LOG_ERROR("add ARR_INTS!!!\n");
+      type_left=ARR_INTS;
+    }else if(type_left==FLOATS&&type_right==ARR_FLOATS){
+      type_left=ARR_FLOATS;
+    }
+    else{
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
   }
+  
   return init(left, right, type_left, condition.comp);
 }
 
 bool DefaultConditionFilter::filter(const Record &rec) const
 {
+  LOG_ERROR("condition_filters_\n");
   char *left_value = nullptr;
   char *right_value = nullptr;
 
@@ -169,6 +181,44 @@ bool DefaultConditionFilter::filter(const Record &rec) const
       float right = *(float *)right_value;
       cmp_result = (int)(left - right);
     } break;
+    case ARR_INTS:{
+      int left = *(int *)left_value;
+      size_t size = *(size_t*)right_value;//获取数组长度
+      int* right=(int*)((char*)right_value+sizeof(size_t));
+      for(size_t i=0;i<size;i++){
+        if(left==right[i]){
+          cmp_result=1;//存在相等的值
+          break;
+        }
+          
+      }
+    }
+    break;
+    case ARR_FLOATS:{
+      float left = *(float *)left_value;
+      size_t size = *(size_t*)right_value;//获取数组长度
+      float* right=(float*)((char*)right_value+sizeof(size_t));
+      for(size_t i=0;i<size;i++){
+        if(left==right[i]){
+          cmp_result=1;//存在相等的值
+          break;
+        }
+          
+      }
+    }
+    break;
+    case ARR_CHARS:{
+      char left = *(char *)left_value;
+      size_t size = *(size_t*)right_value;//获取数组长度
+      char** right=(char**)((char*)right_value+sizeof(size_t));
+      for(size_t i=0;i<size;i++){
+        if(strcmp(left_value, right[i])){
+          cmp_result=1;
+          break;
+        }
+      }
+    }
+    break;
     default: {
     }
   }
@@ -186,7 +236,10 @@ bool DefaultConditionFilter::filter(const Record &rec) const
       return cmp_result >= 0;
     case GREAT_THAN:
       return cmp_result > 0;
-
+    case IN:
+      return cmp_result==1;
+    case NOT_IN:
+      return cmp_result!=1;
     default:
       break;
   }
@@ -246,6 +299,7 @@ RC CompositeConditionFilter::init(Table &table, const Condition *conditions, int
 
 bool CompositeConditionFilter::filter(const Record &rec) const
 {
+
   for (int i = 0; i < filter_num_; i++) {
     if (!filters_[i]->filter(rec)) {
       return false;

@@ -29,6 +29,8 @@ typedef struct {
   char *attribute_name;  // attribute name              属性名
   //TODO: 为RelAttr添加一个聚合属性
   int aggregate_name;  //如果有聚合函数的话，就会多一个聚合函数的名称
+  //TODO: add sub query
+  int sub_select_idx;  //如果为子查询, 此处为子查询的索引 -1表示非子查询
 } RelAttr;
 
 typedef enum {
@@ -47,6 +49,8 @@ typedef enum {
   LESS_THAN,    //"<"     3
   GREAT_EQUAL,  //">="    4
   GREAT_THAN,   //">"     5
+  IN,//in
+  NOT_IN,//not in
   NO_OP
 } CompOp;
 //TODO: add order struct OrderAttr
@@ -58,7 +62,7 @@ typedef struct {
 } OrderAttr;
 
 //属性值类型
-typedef enum { UNDEFINED, CHARS, INTS, FLOATS, DATES } AttrType;
+typedef enum { UNDEFINED, CHARS, INTS, FLOATS, DATES,ARR_CHARS,ARR_INTS,ARR_FLOATS } AttrType;
 
 //属性值
 typedef struct _Value {
@@ -79,7 +83,9 @@ typedef struct _Condition {
 } Condition;
 
 // struct of select
-typedef struct {
+struct Select_1;
+typedef struct Select_1 Selects;
+struct Select_1{
   size_t    attr_num;               // Length of attrs in Select clause
   RelAttr   attributes[MAX_NUM];    // attrs in Select clause
   size_t    relation_num;           // Length of relations in Fro clause
@@ -89,7 +95,10 @@ typedef struct {
   //TODO: add order struct Selects
   size_t    order_num;
   OrderAttr orderattrs[MAX_NUM];
-} Selects;
+  //TODO: add sub query
+  size_t sub_num;
+  Selects* sub_select;
+};
 
 // struct of insert
 typedef struct {
@@ -217,9 +226,12 @@ void attr_info_destroy(AttrInfo *attr_info);
 void selects_init(Selects *selects, ...);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
+void selects_append_condition(Selects *selects, Condition* condition);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
 void selects_destroy(Selects *selects);
-
+//TODO: add sub query
+Selects* to_subquery(Selects* res,int dep,int* path_to_sub);
+void relation_attr_init_query(RelAttr *relation_attr, int aggregate_name,int sub_select_idx);
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num);
 void inserts_destroy(Inserts *inserts);
 

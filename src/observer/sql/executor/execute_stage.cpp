@@ -120,9 +120,10 @@ void ExecuteStage::handle_request(common::StageEvent *event) {
     return;
   }
   exe_event->push_callback(cb);
-
+  
   switch (sql->flag) {
     case SCF_SELECT: { // select
+      
       do_select(current_db, sql, exe_event->sql_event()->session_event());
       exe_event->done_immediate();
     }
@@ -289,7 +290,6 @@ TupleSet tuple_join(TupleSet& join_left_set,const TupleSet& join_right_set,const
           break;
         }
       }
-      
       if(is_right_record){//该组合符合所有条件
         Tuple t;
         for(std::shared_ptr<TupleValue> tv:item_left.values()){
@@ -372,21 +372,89 @@ void init_orderby(const char *db,const Selects &selects,const TupleSet& ts,std::
   }
 
 }
-// 这里没有对输入的某些信息做合法性校验，比如查询的列名、where条件中的列名等，没有做必要的合法性校验
-// 需要补充上这一部分. 校验部分也可以放在resolve，不过跟execution放一起也没有关系
-RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_event) {
-  
+void tupleSetToValue(Value &result,const TupleSet& ts,const CompOp& cp){
+  if(cp!=IN&&cp!=NOT_IN){//非in和not in就直接返回一个值, 第一行第一列
+    const TupleField tf=ts.get_schema().field(0);
+    result.type=tf.type();
+    const std::shared_ptr<TupleValue> tv=ts.get(0).values()[0];
+    tv->get_real_value(result);
+    //TODO: 注意日期应该转为string，回来需要补上
+  }else{
+    const TupleField tf=ts.get_schema().field(0);
+    size_t tuple_size=ts.size();
+    LOG_ERROR("arr condition!!! %d\n",tuple_size);
+    switch (tf.type())
+    {
+    case CHARS:
+      result.type=ARR_CHARS;
+      result.data=malloc(sizeof(char*)*tuple_size+sizeof(size_t));//void->char**
+      memcpy(result.data,&tuple_size,sizeof (tuple_size));//最前面保存数组大小
+      break;
+    case INTS:
+      result.type=ARR_INTS;
+      result.data=malloc(sizeof(int)*tuple_size+sizeof(size_t));
+      memcpy(result.data,&tuple_size,sizeof (tuple_size));
+      break;
+    case FLOATS:
+      result.type=ARR_FLOATS;
+      result.data=malloc(sizeof(float)*tuple_size+sizeof(size_t));
+      memcpy(result.data,&tuple_size,sizeof (tuple_size));
+      break;
+    default:
+      result.type=UNDEFINED;
+      break;
+    }
+    //遍历每一条记录, 追加到result里
+    for(size_t i=0;i<tuple_size;i++){
+      ts.tuples()[i].values()[0]->append_real_value(result,i);//只考虑第一列
+    }
+  }
+}
+//根据select获取查询结果， 保存到result里
+RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &selects,TupleSet& result,int& is_mul_table){
   RC rc = RC::SUCCESS;
   Session *session = session_event->get_client()->session;
   Trx *trx = session->current_trx();
-  const Selects &selects = sql->sstr.selection;
+  printf("view selects: %d\n",selects.sub_num);
+  if(selects.sub_num>0){//如果存在子查询
+    for(size_t i=0;i<selects.condition_num;i++){//遍历所有condition, 将其中的子查询修改为可以正常使用的值
+      Condition &condition = selects.conditions[i];
+      if(condition.left_is_attr&&condition.left_attr.sub_select_idx>-1){//左边属性是子查询
+        //根据比较符号非in或notin 可以知道应该为单个值
+        TupleSet sub_select_left;
+        int tmp;//注意子查询用不到, 只有第一层需要判断是否是多表查询, 来进行输出
+        rc=selectToTupleSet(db, session_event, selects.sub_select[condition.left_attr.sub_select_idx],sub_select_left,tmp);//获取子查询结果
+        if (rc != RC::SUCCESS) {
+          LOG_ERROR("sub select fail!!!\n");
+          session_event->set_response("FAILURE\n");
+          end_trx_if_need(session, trx, false);
+          return rc;
+        }
+        condition.left_is_attr=0;//改为value
+        tupleSetToValue(condition.left_value,sub_select_left,condition.comp);//将子查询改为可以正常使用的值
+      }
+      
+      if(condition.right_is_attr&&condition.right_attr.sub_select_idx>-1){//右边属性是子查询
+        TupleSet sub_select_right;
+        int tmp;
+        rc=selectToTupleSet(db, session_event, selects.sub_select[condition.right_attr.sub_select_idx],sub_select_right,tmp);//获取子查询结果
+        if (rc != RC::SUCCESS) {
+          LOG_ERROR("sub select fail!!!\n");
+          session_event->set_response("FAILURE\n");
+          end_trx_if_need(session, trx, false);
+          return rc;
+        }
+        condition.right_is_attr=0;//改为value
+        tupleSetToValue(condition.right_value,sub_select_right,condition.comp);//将子查询改为可以正常使用的值
+      }
+    }
+  }    
   // 把所有的表和只跟这张表关联的condition都拿出来，生成最底层的select 执行节点
   std::vector<SelectExeNode *> select_nodes;
   for (size_t i = 0; i < selects.relation_num; i++) {
     const char *table_name = selects.relations[i];
     SelectExeNode *select_node = new SelectExeNode;
     rc = create_selection_executor(trx, selects, db, table_name, *select_node);
-    
     if (rc != RC::SUCCESS) {
       LOG_ERROR("create_selection_executor fail!!!\n");
       session_event->set_response("FAILURE\n");
@@ -405,12 +473,13 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
     end_trx_if_need(session, trx, false);
     return RC::SQL_SYNTAX;
   }
-  // LOG_ERROR("create_selection_executor success!!!\n");
+  LOG_ERROR("create_selection_executor success!!!\n");
   std::vector<TupleSet> tuple_sets;
   for (SelectExeNode *&node: select_nodes) {
     TupleSet tuple_set;
     rc = node->execute(tuple_set);
     if (rc != RC::SUCCESS) {
+      LOG_ERROR("execute fail");
       for (SelectExeNode *& tmp_node: select_nodes) {
         delete tmp_node;
       }
@@ -419,15 +488,14 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
     } else {
       // tuple_sets.push_back(std::move(tuple_set));
       //修改顺序
+      // LOG_ERROR("tuple_set: %d",tuple_set.size());
       tuple_sets.insert(tuple_sets.begin(),std::move(tuple_set));
     }
   }
-
-  std::stringstream ss;
-  //TODO: add order 根据select里order属性 获取对应属性在结果Tuple的index和排序方式(ASC或DESC)
-  std::vector<int> order_field_indexs;
-  std::vector<bool> is_asc;
+  LOG_ERROR("execute success!!!\n");
+  //对多个单表查询的结果进行处理, 并赋值给result
   if (tuple_sets.size() > 1) {
+    is_mul_table=1;
     //TODO: add join 对tuple进行join操作
     // //初始化schema
     TupleSet join_left_set;
@@ -447,15 +515,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
       }
       join_left_set=tuple_join(join_left_set,join_right_set,selects.conditions,selects.condition_num);
     }
-    std::vector<int> realField;
-    getPrintIndex(selects,join_left_set.get_schema().fields(),realField);
-    //TODO: add order 如果order条件个数大于0, 需要先排序在输出
-    if(selects.order_num>0){
-      init_orderby(db,selects,join_left_set,order_field_indexs,is_asc);
-      join_left_set.sortTupleByOrder(order_field_indexs,is_asc);
-    }
-    
-    join_left_set.print_rm_tmp(ss,realField);
+    result=std::move(join_left_set);
   } else {
     // 当前只查询一张表，直接返回结果即可
     //TODO: 这里添加对聚合函数的处理,目前只做一张表的
@@ -512,18 +572,52 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
         if (tuple.size()>0)
             tupleSet.add(std::move(tuple));
         tupleSet.set_schema(tupleSchema);
-        tupleSet.print(ss);
+        result=std::move(tupleSet);//处理结果存到返回值
     }else {
-        if(selects.order_num>0){
-          init_orderby(db,selects,tuple_sets.front(),order_field_indexs,is_asc);
-          tuple_sets.front().sortTupleByOrder(order_field_indexs,is_asc);
-        }
-        tuple_sets.front().print(ss);
+        result=std::move(tuple_sets.front());//处理结果存到返回值
     }
   }
 
   for (SelectExeNode *& tmp_node: select_nodes) {
     delete tmp_node;
+  }
+  return rc;
+}
+// 这里没有对输入的某些信息做合法性校验，比如查询的列名、where条件中的列名等，没有做必要的合法性校验
+// 需要补充上这一部分. 校验部分也可以放在resolve，不过跟execution放一起也没有关系
+RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_event) {
+  LOG_ERROR("start do_select!\n");
+  RC rc = RC::SUCCESS;
+  Session *session = session_event->get_client()->session;
+  Trx *trx = session->current_trx();
+  Selects &selects = sql->sstr.selection;
+  TupleSet result;
+  int is_mul_table=0;
+  rc=selectToTupleSet(db,session_event,selects,result,is_mul_table);
+  if (rc != RC::SUCCESS) {
+      LOG_ERROR("sub select fail!!!\n");
+      session_event->set_response("FAILURE\n");
+      end_trx_if_need(session, trx, false);
+      return rc;
+  }
+  //TODO: 处理返回的RC异常
+  std::stringstream ss;
+  //order 排序 用于输出
+  if(selects.order_num>0){
+      //TODO: add order 根据select里order属性 获取对应属性在结果Tuple的index和排序方式(ASC或DESC)
+      std::vector<int> order_field_indexs;
+      std::vector<bool> is_asc;
+      init_orderby(db,selects,result,order_field_indexs,is_asc);
+      result.sortTupleByOrder(order_field_indexs,is_asc);
+  }
+  
+  //打印输出
+  if(is_mul_table==1){//多表, 需要处理一下打印打列顺序
+    std::vector<int> realField;
+    getPrintIndex(selects,result.get_schema().fields(),realField);
+    result.print_rm_tmp(ss,realField);
+  }else{
+    result.print(ss);
   }
   session_event->set_response(ss.str());
   end_trx_if_need(session, trx, true);
@@ -645,7 +739,7 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
       }
     }
   }
-  
+
   // 找出仅与此表相关的过滤条件, 或者都是值的过滤条件
   std::vector<DefaultConditionFilter *> condition_filters;
   for (size_t i = 0; i < selects.condition_num; i++) {
@@ -672,6 +766,7 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
         LOG_ERROR("jump !!!\n");
         continue;
       }
+      
       condition_filters.push_back(condition_filter);
     }//TODO: add join 需要将跨表的属性列加到最终获取的列上
     else if(condition.left_is_attr == 1 && condition.right_is_attr == 1 &&
@@ -694,6 +789,5 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
         schema_add_field(table,condition.right_attr.attribute_name,schema);
     }
   }
-  
   return select_node.init(trx, table, std::move(schema), std::move(condition_filters));
 }

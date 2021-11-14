@@ -366,11 +366,13 @@ static RC scan_record_reader_adapter(Record *record, void *context) {
 }
 
 RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *context, void (*record_reader)(const char *data, void *context)) {
+  
   RecordReaderScanAdapter adapter(record_reader, context);
   return scan_record(trx, filter, limit, (void *)&adapter, scan_record_reader_adapter);
 }
 
 RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *context, RC (*record_reader)(Record *record, void *context)) {
+  
   if (nullptr == record_reader) {
     return RC::INVALID_ARGUMENT;
   }
@@ -382,12 +384,10 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
   if (limit < 0) {
     limit = INT_MAX;
   }
-
   IndexScanner *index_scanner = find_index_for_scan(filter);
   if (index_scanner != nullptr) {
     return scan_record_by_index(trx, index_scanner, filter, limit, context, record_reader);
   }
-
   RC rc = RC::SUCCESS;
   RecordFileScanner scanner;
   rc = scanner.open_scan(*data_buffer_pool_, file_id_, filter);
@@ -420,11 +420,13 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
 
 RC Table::scan_record_by_index(Trx *trx, IndexScanner *scanner, ConditionFilter *filter, int limit, void *context,
                                RC (*record_reader)(Record *, void *)) {
+  
   RC rc = RC::SUCCESS;
   RID rid;
   Record record;
   int record_count = 0;
   while (record_count < limit) {
+    
     rc = scanner->next_entry(&rid);
     if (rc != RC::SUCCESS) {
       if (RC::RECORD_EOF == rc) {
@@ -434,13 +436,13 @@ RC Table::scan_record_by_index(Trx *trx, IndexScanner *scanner, ConditionFilter 
       LOG_ERROR("Failed to scan table by index. rc=%d:%s", rc, strrc(rc));
       break;
     }
-
+    
     rc = record_handler_->get_record(&rid, &record);
     if (rc != RC::SUCCESS) {
       LOG_ERROR("Failed to fetch record of rid=%d:%d, rc=%d:%s", rid.page_num, rid.slot_num, rc, strrc(rc));
       break;
     }
-
+      
     if ((trx == nullptr || trx->is_visible(this, &record)) && (filter == nullptr || filter->filter(record))) {
       rc = record_reader(&record, context);
       if (rc != RC::SUCCESS) {

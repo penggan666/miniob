@@ -868,7 +868,8 @@ condition:
 			value_init_nullvalue(&right_value);
 			Condition condition;
 			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			selects_append_condition(st,&condition);
 	}
 	|ISNULL comOp ID
 		{
@@ -878,7 +879,8 @@ condition:
 			value_init_nullvalue(&left_value);
 			Condition condition;
 			condition_init(&condition, CONTEXT->comp, 0, NULL, &left_value, 1, &right_attr, NULL);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			selects_append_condition(st,&condition);
 		}
 	|ID DOT ID comOp ISNULL
 		{
@@ -888,7 +890,8 @@ condition:
 			value_init_nullvalue(&right_value);
 			Condition condition;
 			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			selects_append_condition(st,&condition);
 	}
 
     |value comOp ID DOT ID

@@ -134,7 +134,12 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
       type_left=ARR_INTS;
     }else if(type_left==FLOATS&&type_right==ARR_FLOATS){
       type_left=ARR_FLOATS;
-    }}else if(type_left == UNDEFINED || type_right == UNDEFINED) {
+    }else if(type_left==FLOATS&&type_right==INTS){//应对子查询需要不同类型比较
+         type_left=FLOAT_INT;
+    }else if(type_left==INTS&&type_right==FLOATS){//应对子查询需要不同类型比较
+        type_left=INT_FLOAT;
+    }
+    }else if(type_left == UNDEFINED || type_right == UNDEFINED) {
       LOG_WARN("this is a null value compare");
     }
     else{
@@ -207,6 +212,16 @@ bool DefaultConditionFilter::filter(const Record &rec) const
       float right = *(float *)right_value;
       cmp_result = (int)(left - right);
     } break;
+    case FLOAT_INT:{//左FLOAT 右INT
+        float left = *(float *)left_value;
+        int right = *(int *)right_value;
+        cmp_result = (int)(left - right);
+    }break;
+    case INT_FLOAT:{//左INT 右FLOAT
+        int left = *(int *)left_value;
+        float right = *(float *)right_value;
+        cmp_result = (int)(left - right);
+    }break;
     case ARR_INTS:{
       int left = *(int *)left_value;
       size_t size = *(size_t*)right_value;//获取数组长度
@@ -234,7 +249,6 @@ bool DefaultConditionFilter::filter(const Record &rec) const
     }
     break;
     case ARR_CHARS:{
-      char left = *(char *)left_value;
       size_t size = *(size_t*)right_value;//获取数组长度
       char** right=(char**)((char*)right_value+sizeof(size_t));
       for(size_t i=0;i<size;i++){

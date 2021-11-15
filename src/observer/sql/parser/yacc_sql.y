@@ -840,7 +840,6 @@ condition:
 			value_init_nullvalue(&left_value);
 			Condition condition;
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
-			// condition_init(&condition, CONTEXT->comp, 0, NULL, &left_value, 0, NULL, right_value);
 			condition_init(&condition, st->comp, 0, NULL, &left_value, 0, NULL, right_value);
 			selects_append_condition(st,&condition);
 			//为支持旧功能如update,delete, 新的select不需要

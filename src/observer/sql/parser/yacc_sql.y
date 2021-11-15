@@ -731,10 +731,15 @@ condition:
 			Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
 
 			Condition condition;
-			
+
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 			condition_init(&condition, st->comp, 1, &left_attr, NULL, 0, NULL, right_value);
 			selects_append_condition(st,&condition);
+
+			//为支持旧功能如update,delete, 新的select不需要
+			Condition condition2;
+			condition_init(&condition2, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			// CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			// $$ = ( Condition *)malloc(sizeof( Condition));
 			// $$->left_is_attr = 1;
@@ -757,6 +762,11 @@ condition:
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 			condition_init(&condition, st->comp, 0, NULL, left_value, 0, NULL, right_value);
 			selects_append_condition(st,&condition);
+
+			//为支持旧功能如update,delete, 新的select不需要
+			Condition condition2;
+			condition_init(&condition2, CONTEXT->comp, 0, NULL, left_value, 0, NULL, right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			// $$ = ( Condition *)malloc(sizeof( Condition));
 			// $$->left_is_attr = 0;
 			// $$->left_attr.relation_name=NULL;
@@ -781,6 +791,11 @@ condition:
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 			condition_init(&condition, st->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
 			selects_append_condition(st,&condition);
+
+			//为支持旧功能如update,delete, 新的select不需要
+			Condition condition2;
+			condition_init(&condition2, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			// $$=( Condition *)malloc(sizeof( Condition));
 			// $$->left_is_attr = 1;
 			// $$->left_attr.relation_name=NULL;
@@ -802,7 +817,10 @@ condition:
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 			condition_init(&condition, st->comp, 0, NULL, left_value, 1, &right_attr, NULL);
 			selects_append_condition(st,&condition);
-
+			//为支持旧功能如update,delete, 新的select不需要
+			Condition condition2;
+			condition_init(&condition2, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			// $$=( Condition *)malloc(sizeof( Condition));
 			// $$->left_is_attr = 0;
 			// $$->left_attr.relation_name=NULL;
@@ -825,6 +843,10 @@ condition:
 			// condition_init(&condition, CONTEXT->comp, 0, NULL, &left_value, 0, NULL, right_value);
 			condition_init(&condition, st->comp, 0, NULL, &left_value, 0, NULL, right_value);
 			selects_append_condition(st,&condition);
+			//为支持旧功能如update,delete, 新的select不需要
+			Condition condition2;
+			condition_init(&condition2, CONTEXT->comp ,0, NULL, &left_value, 0, NULL, right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			// CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 		}	
 	|value comOp ISNULL
@@ -837,6 +859,10 @@ condition:
 			condition_init(&condition, st->comp, 0, NULL, left_value, 0, NULL, &right_value);
 			// condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 0, NULL, &right_value);
 			selects_append_condition(st,&condition);
+			//为支持旧功能如update,delete, 新的select不需要
+			Condition condition2;
+			condition_init(&condition2, CONTEXT->comp, 0, NULL, left_value, 0, NULL, &right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			// CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 		}
 	|ISNULL comOp ISNULL
@@ -851,6 +877,10 @@ condition:
 			selects_append_condition(st,&condition);
 			// condition_init(&condition, CONTEXT->comp, 0, NULL, &left_value, 0, NULL, &right_value);
 			// CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			//为支持旧功能如update,delete, 新的select不需要
+			Condition condition2;
+			condition_init(&condition2, CONTEXT->comp, 0, NULL, &left_value, 0, NULL, &right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 		}		
     |ID DOT ID comOp value
 		{
@@ -861,6 +891,11 @@ condition:
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 			condition_init(&condition, st->comp, 1, &left_attr, NULL, 0, NULL, right_value);
 			selects_append_condition(st,&condition);
+
+			//为支持旧功能如update,delete, 新的select不需要
+			Condition condition2;
+			condition_init(&condition2, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			// $$=( Condition *)malloc(sizeof( Condition));
 			// $$->left_is_attr = 1;
 			// $$->left_attr.relation_name=$1;
@@ -883,6 +918,10 @@ condition:
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 			condition_init(&condition, st->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
 			selects_append_condition(st,&condition);
+			//为支持旧功能如update,delete, 新的select不需要
+			Condition condition2;
+			condition_init(&condition2, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 	}
 	|ISNULL comOp ID
 		{
@@ -895,6 +934,10 @@ condition:
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 			condition_init(&condition, st->comp, 0, NULL, &left_value, 1, &right_attr, NULL);
 			selects_append_condition(st,&condition);
+			//为支持旧功能如update,delete, 新的select不需要
+			Condition condition2;
+			condition_init(&condition2, CONTEXT->comp, 0, NULL, &left_value, 1, &right_attr, NULL);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 		}
 	|ID DOT ID comOp ISNULL
 		{
@@ -907,6 +950,10 @@ condition:
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 			condition_init(&condition, st->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
 			selects_append_condition(st,&condition);
+			//为支持旧功能如update,delete, 新的select不需要
+			Condition condition2;
+			condition_init(&condition2, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 	}
 
     |value comOp ID DOT ID
@@ -921,6 +968,10 @@ condition:
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 			condition_init(&condition, st->comp, 0, NULL, left_value, 1, &right_attr, NULL);
 			selects_append_condition(st,&condition);
+			//为支持旧功能如update,delete, 新的select不需要
+			Condition condition2;
+			condition_init(&condition2, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			// $$=( Condition *)malloc(sizeof( Condition));
 			// $$->left_is_attr = 0;//属性值
 			// $$->left_attr.relation_name=NULL;
@@ -944,6 +995,10 @@ condition:
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 			condition_init(&condition, st->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
 			selects_append_condition(st,&condition);
+			//为支持旧功能如update,delete, 新的select不需要
+			Condition condition2;
+			condition_init(&condition2, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			// $$=( Condition *)malloc(sizeof( Condition));
 			// $$->left_is_attr = 1;		//属性
 			// $$->left_attr.relation_name=$1;
@@ -998,55 +1053,55 @@ condition:
 comOp:
   	  EQ { 
 		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
-					// CONTEXT->comp = EQUAL_TO; 
+		CONTEXT->comp = EQUAL_TO; 
 		st->comp=EQUAL_TO;
 			}
     | LT { 
 		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 		st->comp=LESS_THAN;
-		// CONTEXT->comp = LESS_THAN; 
+		CONTEXT->comp = LESS_THAN; 
 		}
     | GT { 
 		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 		st->comp=GREAT_THAN;
-		// CONTEXT->comp = GREAT_THAN; 
+		CONTEXT->comp = GREAT_THAN; 
 		}
     | LE { 
 		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 		st->comp=LESS_EQUAL;
-		// CONTEXT->comp = LESS_EQUAL; 
+		CONTEXT->comp = LESS_EQUAL; 
 		}
     | GE { 
 		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 		st->comp=GREAT_EQUAL;
-		// CONTEXT->comp = GREAT_EQUAL; 
+		CONTEXT->comp = GREAT_EQUAL; 
 		}
     | NE { 
 		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 		st->comp=NOT_EQUAL;
-		// CONTEXT->comp = NOT_EQUAL; 
+		CONTEXT->comp = NOT_EQUAL; 
 		}
 	| NOT IN_T{
 
 		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 		st->comp=NOT_IN;
-		// CONTEXT->comp = NOT_IN; 
+		CONTEXT->comp = NOT_IN; 
 		}
 	| IN_T{
 		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 		st->comp=IN;
-		// CONTEXT->comp = IN;
+		CONTEXT->comp = IN;
 		}
 	| IS {
 		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 		st->comp=IS_;
-		// CONTEXT->comp = IS_;
+		CONTEXT->comp = IS_;
 		}
 	| IS NOT{
 
 		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
 		st->comp=IS_NOT;
-		// CONTEXT->comp = IS_NOT;
+		CONTEXT->comp = IS_NOT;
 		}
     ;
 

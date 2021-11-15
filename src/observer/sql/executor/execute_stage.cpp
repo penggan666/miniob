@@ -630,6 +630,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   Selects &selects = sql->sstr.selection;
   TupleSet result;
   int is_mul_table=0;
+  //原本查询的核心逻辑封装到这个函数中
   rc=selectToTupleSet(db,session_event,selects,result,is_mul_table);
   if (rc != RC::SUCCESS) {
       LOG_ERROR("sub select fail!!!\n");

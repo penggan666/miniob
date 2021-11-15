@@ -2779,7 +2779,7 @@ yyreduce:
 		RelAttr right_attr;
 		relation_attr_init_query(&right_attr,0,st->sub_num-1);
 		RelAttr left_attr;
-		relation_attr_init_query(&left_attr,0,st->sub_num-1);
+		relation_attr_init_query(&left_attr,0,st->sub_num-2);
 		Condition condition;
 		condition_init(&condition, st->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
 		selects_append_condition(st,&condition);

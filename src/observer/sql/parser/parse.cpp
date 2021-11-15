@@ -92,7 +92,6 @@ void condition_init(Condition *condition, CompOp comp,
     condition->left_attr = *left_attr;
   } else {
     condition->left_value = *left_value;
-    printf("%d\n",right_is_attr);
   }
 
   condition->right_is_attr = right_is_attr;

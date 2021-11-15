@@ -731,8 +731,9 @@ condition:
 			Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
 
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, right_value);
+			
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			condition_init(&condition, st->comp, 1, &left_attr, NULL, 0, NULL, right_value);
 			selects_append_condition(st,&condition);
 			// CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			// $$ = ( Condition *)malloc(sizeof( Condition));
@@ -752,8 +753,9 @@ condition:
 			Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
 
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 0, NULL, right_value);
+			// condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 0, NULL, right_value);
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			condition_init(&condition, st->comp, 0, NULL, left_value, 0, NULL, right_value);
 			selects_append_condition(st,&condition);
 			// $$ = ( Condition *)malloc(sizeof( Condition));
 			// $$->left_is_attr = 0;
@@ -775,8 +777,9 @@ condition:
 			relation_attr_init(&right_attr, NULL, $3, 0);
 
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+			// condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			condition_init(&condition, st->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
 			selects_append_condition(st,&condition);
 			// $$=( Condition *)malloc(sizeof( Condition));
 			// $$->left_is_attr = 1;
@@ -795,8 +798,9 @@ condition:
 			relation_attr_init(&right_attr, NULL, $3, 0);
 
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
+			// condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			condition_init(&condition, st->comp, 0, NULL, left_value, 1, &right_attr, NULL);
 			selects_append_condition(st,&condition);
 
 			// $$=( Condition *)malloc(sizeof( Condition));
@@ -817,8 +821,11 @@ condition:
             Value left_value;
 			value_init_nullvalue(&left_value);
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 0, NULL, &left_value, 0, NULL, right_value);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			// condition_init(&condition, CONTEXT->comp, 0, NULL, &left_value, 0, NULL, right_value);
+			condition_init(&condition, st->comp, 0, NULL, &left_value, 0, NULL, right_value);
+			selects_append_condition(st,&condition);
+			// CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 		}	
 	|value comOp ISNULL
 	    {
@@ -826,8 +833,11 @@ condition:
             Value right_value;
 			value_init_nullvalue(&right_value);
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 0, NULL, &right_value);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			condition_init(&condition, st->comp, 0, NULL, left_value, 0, NULL, &right_value);
+			// condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 0, NULL, &right_value);
+			selects_append_condition(st,&condition);
+			// CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 		}
 	|ISNULL comOp ISNULL
 		{
@@ -836,18 +846,20 @@ condition:
 			value_init_nullvalue(&right_value);
 			Value left_value;
             value_init_nullvalue(&left_value);
-			condition_init(&condition, CONTEXT->comp, 0, NULL, &left_value, 0, NULL, &right_value);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			condition_init(&condition, st->comp, 0, NULL, &left_value, 0, NULL, &right_value);
+			selects_append_condition(st,&condition);
+			// condition_init(&condition, CONTEXT->comp, 0, NULL, &left_value, 0, NULL, &right_value);
+			// CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 		}		
     |ID DOT ID comOp value
 		{
 			RelAttr left_attr;
 			relation_attr_init(&left_attr, $1, $3, 0);
 			Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
-
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, right_value);
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			condition_init(&condition, st->comp, 1, &left_attr, NULL, 0, NULL, right_value);
 			selects_append_condition(st,&condition);
 			// $$=( Condition *)malloc(sizeof( Condition));
 			// $$->left_is_attr = 1;
@@ -867,8 +879,9 @@ condition:
             Value right_value;
 			value_init_nullvalue(&right_value);
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
+			// condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			condition_init(&condition, st->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
 			selects_append_condition(st,&condition);
 	}
 	|ISNULL comOp ID
@@ -878,8 +891,9 @@ condition:
 			Value left_value;
 			value_init_nullvalue(&left_value);
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 0, NULL, &left_value, 1, &right_attr, NULL);
+			// condition_init(&condition, CONTEXT->comp, 0, NULL, &left_value, 1, &right_attr, NULL);
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			condition_init(&condition, st->comp, 0, NULL, &left_value, 1, &right_attr, NULL);
 			selects_append_condition(st,&condition);
 		}
 	|ID DOT ID comOp ISNULL
@@ -889,8 +903,9 @@ condition:
             Value right_value;
 			value_init_nullvalue(&right_value);
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
+			// condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			condition_init(&condition, st->comp, 1, &left_attr, NULL, 0, NULL, &right_value);
 			selects_append_condition(st,&condition);
 	}
 
@@ -902,8 +917,9 @@ condition:
 			relation_attr_init(&right_attr, $3, $5, 0);
 
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
+			// condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			condition_init(&condition, st->comp, 0, NULL, left_value, 1, &right_attr, NULL);
 			selects_append_condition(st,&condition);
 			// $$=( Condition *)malloc(sizeof( Condition));
 			// $$->left_is_attr = 0;//属性值
@@ -924,8 +940,9 @@ condition:
 			relation_attr_init(&right_attr, $5, $7, 0);
 
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+			// condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
 			Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+			condition_init(&condition, st->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
 			selects_append_condition(st,&condition);
 			// $$=( Condition *)malloc(sizeof( Condition));
 			// $$->left_is_attr = 1;		//属性
@@ -943,7 +960,7 @@ condition:
 		RelAttr right_attr;
 		relation_attr_init_query(&right_attr,0,st->sub_num-1);
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+		condition_init(&condition, st->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
 		selects_append_condition(st,&condition);
 	}
 	| ID DOT ID comOp sub_select{
@@ -953,7 +970,7 @@ condition:
 		RelAttr right_attr;
 		relation_attr_init_query(&right_attr,0,st->sub_num-1);
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+		condition_init(&condition, st->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
 		selects_append_condition(st,&condition);
 	}
 	| sub_select comOp ID{
@@ -963,7 +980,7 @@ condition:
 		RelAttr left_attr;
 		relation_attr_init_query(&left_attr,0,st->sub_num-1);
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+		condition_init(&condition, st->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
 		selects_append_condition(st,&condition);
 	}
 	| sub_select comOp ID DOT ID{
@@ -973,22 +990,64 @@ condition:
 		RelAttr left_attr;
 		relation_attr_init_query(&left_attr,0,st->sub_num-1);
 		Condition condition;
-		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+		condition_init(&condition, st->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
 		selects_append_condition(st,&condition);
 	}
     ;
 
 comOp:
-  	  EQ { CONTEXT->comp = EQUAL_TO; }
-    | LT { CONTEXT->comp = LESS_THAN; }
-    | GT { CONTEXT->comp = GREAT_THAN; }
-    | LE { CONTEXT->comp = LESS_EQUAL; }
-    | GE { CONTEXT->comp = GREAT_EQUAL; }
-    | NE { CONTEXT->comp = NOT_EQUAL; }
-	| NOT IN_T{CONTEXT->comp = NOT_IN; }
-	| IN_T{CONTEXT->comp = IN;}
-	| IS { CONTEXT->comp = IS_;}
-	| IS NOT{ CONTEXT->comp = IS_NOT;}
+  	  EQ { 
+		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+					// CONTEXT->comp = EQUAL_TO; 
+		st->comp=EQUAL_TO;
+			}
+    | LT { 
+		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+		st->comp=LESS_THAN;
+		// CONTEXT->comp = LESS_THAN; 
+		}
+    | GT { 
+		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+		st->comp=GREAT_THAN;
+		// CONTEXT->comp = GREAT_THAN; 
+		}
+    | LE { 
+		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+		st->comp=LESS_EQUAL;
+		// CONTEXT->comp = LESS_EQUAL; 
+		}
+    | GE { 
+		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+		st->comp=GREAT_EQUAL;
+		// CONTEXT->comp = GREAT_EQUAL; 
+		}
+    | NE { 
+		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+		st->comp=NOT_EQUAL;
+		// CONTEXT->comp = NOT_EQUAL; 
+		}
+	| NOT IN_T{
+
+		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+		st->comp=NOT_IN;
+		// CONTEXT->comp = NOT_IN; 
+		}
+	| IN_T{
+		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+		st->comp=IN;
+		// CONTEXT->comp = IN;
+		}
+	| IS {
+		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+		st->comp=IS_;
+		// CONTEXT->comp = IS_;
+		}
+	| IS NOT{
+
+		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+		st->comp=IS_NOT;
+		// CONTEXT->comp = IS_NOT;
+		}
     ;
 
 load_data:

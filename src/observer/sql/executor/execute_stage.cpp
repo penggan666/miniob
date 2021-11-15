@@ -374,30 +374,45 @@ void init_orderby(const char *db,const Selects &selects,const TupleSet& ts,std::
 
 }
 void tupleSetToValue(Value &result,const TupleSet& ts,const CompOp& cp){
-  if(cp!=IN&&cp!=NOT_IN){//非in和not in就直接返回一个值, 第一行第一列
+    if(cp!=IN&&cp!=NOT_IN){//非in和not in就直接返回一个值, 第一行第一列
     const TupleField tf=ts.get_schema().field(0);
     result.type=tf.type();
+    if(ts.is_empty()){//处理子查询结果为空的情况
+        result.data= nullptr;
+        return;
+    }
     const std::shared_ptr<TupleValue> tv=ts.get(0).values()[0];
     tv->get_real_value(result);
     //TODO: 注意日期应该转为string，回来需要补上
-  }else{
+  }else{//返回数组
     const TupleField tf=ts.get_schema().field(0);
     size_t tuple_size=ts.size();
-    LOG_ERROR("arr condition!!! %d\n",tuple_size);
     switch (tf.type())
     {
     case CHARS:
       result.type=ARR_CHARS;
+        if(ts.is_empty()){//处理子查询结果为空的情况
+            result.data= nullptr;
+            return;
+        }
       result.data=malloc(sizeof(char*)*tuple_size+sizeof(size_t));//void->char**
       memcpy(result.data,&tuple_size,sizeof (tuple_size));//最前面保存数组大小
       break;
     case INTS:
       result.type=ARR_INTS;
+        if(ts.is_empty()){//处理子查询结果为空的情况
+            result.data= nullptr;
+            return;
+        }
       result.data=malloc(sizeof(int)*tuple_size+sizeof(size_t));
       memcpy(result.data,&tuple_size,sizeof (tuple_size));
       break;
     case FLOATS:
       result.type=ARR_FLOATS;
+        if(ts.is_empty()){//处理子查询结果为空的情况
+            result.data= nullptr;
+            return;
+        }
       result.data=malloc(sizeof(float)*tuple_size+sizeof(size_t));
       memcpy(result.data,&tuple_size,sizeof (tuple_size));
       break;
@@ -413,10 +428,9 @@ void tupleSetToValue(Value &result,const TupleSet& ts,const CompOp& cp){
 }
 //根据select获取查询结果， 保存到result里
 RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &selects,TupleSet& result,int& is_mul_table){
-  RC rc = RC::SUCCESS;
+    RC rc = RC::SUCCESS;
   Session *session = session_event->get_client()->session;
   Trx *trx = session->current_trx();
-  printf("view selects: %d\n",selects.sub_num);
   if(selects.sub_num>0){//如果存在子查询
     for(size_t i=0;i<selects.condition_num;i++){//遍历所有condition, 将其中的子查询修改为可以正常使用的值
       Condition &condition = selects.conditions[i];

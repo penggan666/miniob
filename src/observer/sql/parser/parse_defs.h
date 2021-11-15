@@ -98,6 +98,7 @@ struct Select_1{
   size_t    order_num;
   OrderAttr orderattrs[MAX_NUM];
   //TODO: add sub query
+  CompOp comp;
   size_t sub_num;
   Selects* sub_select;
 };

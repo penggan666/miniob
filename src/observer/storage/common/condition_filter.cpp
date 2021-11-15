@@ -150,14 +150,13 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
 
 bool DefaultConditionFilter::filter(const Record &rec) const
 {
-  LOG_ERROR("condition_filters_\n");
   char *left_value = nullptr;
   char *right_value = nullptr;
   int is_null = 0;
 
-  if (left_.is_attr) {  // value
+  if (left_.is_attr) {
       left_value = (char *)(rec.data + left_.attr_offset + sizeof(int));
-      is_null = *(int *)(rec.data + left_.attr_offset);
+      is_null = *(int *)(rec.data + left_.attr_offset);//判断属性列是否为null
   } else {
     left_value = (char *)left_.value;
   }
@@ -182,7 +181,13 @@ bool DefaultConditionFilter::filter(const Record &rec) const
         else
             return true;
   }
-
+  //in也要特别处理空值的情况
+    if (comp_op_==IN&&right_value== nullptr){//in一个空
+        return false;
+    }
+    if(comp_op_==NOT_IN&&right_value== nullptr){
+        return true;
+    }
   //这里是判断null=null的情况
   if(right_value==nullptr || left_value==nullptr){
     return false;

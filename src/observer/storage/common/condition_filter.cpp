@@ -137,11 +137,11 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
          type_left=FLOAT_INT;
     }else if(type_left==INTS&&type_right==FLOATS){//应对子查询需要不同类型比较
         type_left=INT_FLOAT;
-    }
     }else if(type_left == UNDEFINED || type_right == UNDEFINED) {
-      LOG_WARN("this is a null value compare");
+        LOG_WARN("this is a null value compare");
     }else{
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
   }
 
     return init(left, right, type_left, condition.comp);

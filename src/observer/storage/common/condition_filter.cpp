@@ -210,17 +210,33 @@ bool DefaultConditionFilter::filter(const Record &rec) const
     case FLOATS: {
       float left = *(float *)left_value;
       float right = *(float *)right_value;
-      cmp_result = (int)(left - right);
+//      cmp_result = (int)(left - right);//不能强转为int, 例如0.2会转为0,含义出错
+    float tmp=left - right;
+    if(tmp<0){
+        cmp_result=-1;
+    }else if(tmp>0){
+        cmp_result=1;
+    }
     } break;
     case FLOAT_INT:{//左FLOAT 右INT
         float left = *(float *)left_value;
         int right = *(int *)right_value;
-        cmp_result = (int)(left - right);
+        float tmp=left - right;
+        if(tmp<0){
+            cmp_result=-1;
+        }else if(tmp>0){
+            cmp_result=1;
+        }
     }break;
     case INT_FLOAT:{//左INT 右FLOAT
         int left = *(int *)left_value;
         float right = *(float *)right_value;
-        cmp_result = (int)(left - right);
+        float tmp=left - right;
+        if(tmp<0){
+            cmp_result=-1;
+        }else if(tmp>0){
+            cmp_result=1;
+        }
     }break;
     case ARR_INTS:{
       int left = *(int *)left_value;

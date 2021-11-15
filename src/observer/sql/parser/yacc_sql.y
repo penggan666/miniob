@@ -956,6 +956,26 @@ condition:
 		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
 		selects_append_condition(st,&condition);
 	}
+	| sub_select comOp ID{
+		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+		RelAttr right_attr;
+		relation_attr_init(&right_attr, NULL, $3, 0);
+		RelAttr left_attr;
+		relation_attr_init_query(&left_attr,0,st->sub_num-1);
+		Condition condition;
+		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+		selects_append_condition(st,&condition);
+	}
+	| sub_select comOp ID DOT ID{
+		Selects* st=to_subquery(&CONTEXT->ssql->sstr.selection,CONTEXT->now_select_dep,CONTEXT->path_to_sub);
+		RelAttr right_attr;
+		relation_attr_init(&right_attr, $3, $5, 0);
+		RelAttr left_attr;
+		relation_attr_init_query(&left_attr,0,st->sub_num-1);
+		Condition condition;
+		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+		selects_append_condition(st,&condition);
+	}
     ;
 
 comOp:

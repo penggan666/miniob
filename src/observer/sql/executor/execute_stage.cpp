@@ -254,6 +254,7 @@ void init_join(const TupleSet& join_left_set,const TupleSet& join_right_set,cons
   }
 }
 bool isRightRecord(std::shared_ptr<TupleValue> left_value,std::shared_ptr<TupleValue> right_value,CompOp& comp_op_){
+    if(left_value->get_is_null()||right_value->get_is_null())return false;//NULL不管怎么比较都返回fasle
     int cmp_result = left_value->compare(*right_value);
     switch (comp_op_) {
     case EQUAL_TO:

@@ -46,16 +46,16 @@ void Tuple::add(TupleValue *value) {
 void Tuple::add(const std::shared_ptr<TupleValue> &other) {
   values_.emplace_back(other);
 }
-void Tuple::add(int value) {
-  add(new IntValue(value));
+void Tuple::add(int value,int is_null) {
+  add(new IntValue(value,is_null));
 }
 
-void Tuple::add(float value) {
-  add(new FloatValue(value));
+void Tuple::add(float value,int is_null) {
+  add(new FloatValue(value,is_null));
 }
 
-void Tuple::add(const char *s, int len) {
-  add(new StringValue(s, len));
+void Tuple::add(const char *s, int len,int is_null) {
+  add(new StringValue(s, len, is_null));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -226,6 +226,11 @@ void TupleSet::sortTupleByOrder(const std::vector<int> &fieldIndex, const std::v
 }
 const std::vector<std::shared_ptr<TupleValue>> TupleSet::minTuple(int i) {
     sortTuple(i);
+    for (int j=0;j<tuples_.size();j++){
+        if (tuples_[j].get(i).get_is_null()==0){
+            return tuples_[j].values();
+        }
+    }
     return tuples_.front().values();
 }
 
@@ -234,18 +239,35 @@ const std::vector<std::shared_ptr<TupleValue>> TupleSet::maxTuple(int i) {
     return tuples_.back().values();
 }
 
-int TupleSet::countTuple() {
+int TupleSet::countTupleStar() {
     return tuples_.size();
+}
+
+int TupleSet::countTupleColumn(int i) {
+    int sum=0;
+    for (int j=0;j<tuples_.size();j++){
+        if (tuples_[j].get(i).get_is_null()==0){
+            sum+=1;
+        }
+    }
+    return sum;
 }
 
 float TupleSet::avgTuple(int i) {
     float sum=0;
     float value=0;
+    int all_null=1;
     for (int j=0;j<tuples_.size();j++){
-        tuples_[j].get(i).get_value(value);
-        sum+=value;
+        if (tuples_[j].get(i).get_is_null()==0) {
+            all_null=0;
+            tuples_[j].get(i).get_value(value);
+            sum += value;
+        }
     }
-    return sum/tuples_.size();
+    if(tuples_.size()!=0&&all_null==1){
+        return -1;
+    }
+    return sum/countTupleColumn(i);
 }
 
 void TupleSet::print(std::ostream &os) const {
@@ -325,26 +347,27 @@ void TupleRecordConverter::add_record(const char *record) {
   for (const TupleField &field : schema.fields()) {
     const FieldMeta *field_meta = table_meta.field(field.field_name());
     assert(field_meta != nullptr);
+    int is_null = *(int*)(record + field_meta->offset());
     switch (field_meta->type()) {
       case INTS: {
-        int value = *(int*)(record + field_meta->offset());
-        tuple.add(value);
+          int value = *(int*)(record + field_meta->offset() + sizeof(int));
+        tuple.add(value,is_null);
       }
       break;
       case FLOATS: {
-        float value = *(float *)(record + field_meta->offset());
-        tuple.add(value);
+        float value = *(float *)(record + field_meta->offset() + sizeof(int));
+        tuple.add(value,is_null);
       }
-        break;
+      break;
       case CHARS: {
-        const char *s = record + field_meta->offset();  // 现在当做Cstring来处理
-        tuple.add(s, strlen(s));
+        const char *s = record + field_meta->offset() + sizeof(int);  // 现在当做Cstring来处理
+        tuple.add(s, strlen(s),is_null);
       }
       break;
       //TODO: add date select展示数据
       case DATES:{
         //取出int数据
-        int value = *(int*)(record + field_meta->offset());
+        int value = *(int*)(record + field_meta->offset() + sizeof(int));
         //转化位string
         int year=value/10000;
         int month=(value%10000)/100;
@@ -352,7 +375,7 @@ void TupleRecordConverter::add_record(const char *record) {
         std::stringstream ss;
 	      ss << year << "-" << std::setw(2) << std::setfill('0') << month<<"-"<<std::setw(2) << std::setfill('0')<<day;
         const char *s=ss.str().c_str();
-        tuple.add(s, strlen(s));//TODO:join 注意tuple阶段的date类型会被初始化位StringValue
+        tuple.add(s, strlen(s),is_null);//TODO:join 注意tuple阶段的date类型会被初始化位StringValue
       }
       break;
       default: {

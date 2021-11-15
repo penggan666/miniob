@@ -37,9 +37,9 @@ public:
 
   void add(TupleValue *value);
   void add(const std::shared_ptr<TupleValue> &other);
-  void add(int value);
-  void add(float value);
-  void add(const char *s, int len);
+  void add(int value,int is_null);
+  void add(float value,int is_null);
+  void add(const char *s, int len,int is_null);
 
   const std::vector<std::shared_ptr<TupleValue>> &values() const {
     return values_;
@@ -148,7 +148,8 @@ public:
   //TODO: 取tuple的某列的平均值
   float avgTuple(int i);
   //TODO: 取tuple的数量
-  int countTuple();
+  int countTupleStar();
+  int countTupleColumn(int i);
 
   //TODO: add order 根据多列进行排序
   void sortTupleByOrder(const std::vector<int> &fieldIndex, const std::vector<bool> & isAsc);

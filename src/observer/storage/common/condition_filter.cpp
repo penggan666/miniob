@@ -126,6 +126,7 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
       memcpy(right.value,&date_i, sizeof(date_i));
     }else if((!left.is_attr)&&type_left==CHARS&&right.is_attr&&type_right==DATES&&(date_i=dateToInt((char*)left.value))!=-1){
       memcpy(left.value,&date_i, sizeof(date_i));
+<<<<<<< HEAD
     }//TODO:add join 对多种数组类型增加判断
     else if(type_left==CHARS&&type_right==ARR_CHARS){
       type_left=ARR_CHARS;
@@ -140,6 +141,15 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
     }
   }
   
+=======
+    }else if(type_left == UNDEFINED || type_right == UNDEFINED) {
+      LOG_WARN("this is a null value compare");
+    }else{
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+    }
+
+>>>>>>> master
   return init(left, right, type_left, condition.comp);
 }
 
@@ -148,17 +158,43 @@ bool DefaultConditionFilter::filter(const Record &rec) const
   LOG_ERROR("condition_filters_\n");
   char *left_value = nullptr;
   char *right_value = nullptr;
+  int is_null = 0;
 
   if (left_.is_attr) {  // value
-    left_value = (char *)(rec.data + left_.attr_offset);
+      left_value = (char *)(rec.data + left_.attr_offset + sizeof(int));
+      is_null = *(int *)(rec.data + left_.attr_offset);
   } else {
     left_value = (char *)left_.value;
   }
 
   if (right_.is_attr) {
-    right_value = (char *)(rec.data + right_.attr_offset);
+      right_value = (char *)(rec.data + right_.attr_offset + sizeof(int));
+      is_null = *(int *)(rec.data + left_.attr_offset);
   } else {
     right_value = (char *)right_.value;
+  }
+
+  //当比较符是is或者is not是特殊处理
+  if (comp_op_==IS_){
+        if(is_null==1 || (left_value == nullptr&&right_value== nullptr))
+            return true;
+        else
+            return false;
+  }
+  if (comp_op_==IS_NOT){
+        if(is_null==1 || (left_value == nullptr&&right_value== nullptr))
+            return false;
+        else
+            return true;
+  }
+
+  //这里是判断null=null的情况
+  if(right_value==nullptr || left_value==nullptr){
+    return false;
+  }
+  //如果左属性或右属性哪一个为null，那么直接返回false
+  if(is_null==1){
+      return false;
   }
 
   int cmp_result = 0;

@@ -272,7 +272,7 @@ RC BplusTreeHandler::insert_into_leaf(PageNum leaf_page, const char *pkey, const
   node = get_index_node(pdata);
 
   for(insert_pos = 0; insert_pos < node->key_num; insert_pos++){
-    if (file_header_.is_unique==1 && CompareKey(pkey, node->keys + insert_pos * file_header_.key_length,file_header_.attr_type, file_header_.attr_length)){
+    if (file_header_.is_unique==1 && CompareKey(pkey, node->keys + insert_pos * file_header_.key_length,file_header_.attr_type, file_header_.attr_length)==0){
         return RC::RECORD_DUPLICATE_KEY;
     }
     tmp = CmpKey(file_header_.attr_type, file_header_.attr_length, pkey, node->keys + insert_pos * file_header_.key_length);

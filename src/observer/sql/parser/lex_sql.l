@@ -82,8 +82,11 @@ QUOTE            [\'\"]
 [Ii][Nn][Nn][Ee][Rr]					 RETURN_TOKEN(INNER);//TODO: add inner join
 [Jj][Oo][Ii][Nn]                         RETURN_TOKEN(JOIN);
 [Uu][Nn][Ii][Qq][Uu][Ee]                 RETURN_TOKEN(UNIQUE);
-[Nn][Oo][Tt]							 RETURN_TOKEN(NOT);
 [Ii][Nn]								 RETURN_TOKEN(IN_T);
+[Nn][Oo][Tt]							 RETURN_TOKEN(NOT);	
+[Nn][Uu][Ll][Ll]						 RETURN_TOKEN(ISNULL);
+[Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]		 RETURN_TOKEN(NULLABLE);
+[Ii][Ss]								 RETURN_TOKEN(IS);	
 {ID}							                       yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "("								                       RETURN_TOKEN(LBRACE);
 ")"								                       RETURN_TOKEN(RBRACE);

@@ -282,14 +282,15 @@ RC Table::make_record(int value_num, const Value *values, char ** &record_out) {
       int date_i;
       if(field->type()==DATES&&value.type==CHARS&&(date_i=dateToInt((char*)value.data))!=-1){//date字段特判
           map_date.insert(std::pair<int,int>(i,date_i));
-      }else{
+      } else if(field->is_null()==1&&value.type==UNDEFINED){
+          LOG_ERROR("this is a null value");
+      } else{
         LOG_ERROR("Invalid value type. field name=%s, type=%d, but given=%d",
         field->name(), field->type(), value.type);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
     }
   }
-
   // 复制所有字段的值
   int record_size = table_meta_.record_size();
   char **record;
@@ -297,7 +298,6 @@ RC Table::make_record(int value_num, const Value *values, char ** &record_out) {
   for (int i=0;i<value_num/table_meta_value_num;i++){
       record[i] = new char [record_size];
   }
-
   //char *record = new char [record_size];
 
   for (int i = 0; i < value_num; i++) {
@@ -306,14 +306,20 @@ RC Table::make_record(int value_num, const Value *values, char ** &record_out) {
     if((iter=map_date.find(i))!=map_date.end()){
       int date_i=iter->second;
       const FieldMeta *field = table_meta_.field(i % table_meta_value_num + normal_field_start_index);
-      memcpy(record[i / table_meta_value_num] + field->offset(),&date_i, field->len());
+      int is_null = 0;
+      memcpy(record[i / table_meta_value_num] + field->offset(), &is_null, sizeof(int));
+      memcpy(record[i / table_meta_value_num] + field->offset()+sizeof(int),&date_i, field->len()-sizeof(int));
     }else{
       const FieldMeta *field = table_meta_.field(i % table_meta_value_num + normal_field_start_index);
       const Value &value = values[i];
-      memcpy(record[i / table_meta_value_num] + field->offset(), value.data, field->len());
+      int is_null = (value.type==UNDEFINED ? 1 : 0);
+      memcpy(record[i / table_meta_value_num] + field->offset(), &is_null, sizeof(int));
+      if (is_null==1) {
+          continue;
+      }
+      memcpy(record[i / table_meta_value_num] + field->offset()+sizeof(int) , value.data, field->len()-sizeof(int));
     }
   }
-
   record_out = record;
   return RC::SUCCESS;
 }
@@ -608,7 +614,9 @@ RC Table::update_record(Trx *trx, Record *record,const char *attribute_name, con
                 return RC::SCHEMA_FIELD_TYPE_MISMATCH;
               }
             }
-            memcpy(record->data+field->offset(), value1.data, field->len());
+            int is_null=0;
+            memcpy(record->data+field->offset(),&is_null,sizeof(int));
+            memcpy(record->data+field->offset()+sizeof(int), value1.data, field->len()-sizeof(int));
         }
     }
     //事务部分和对索引部分的更新还未实现
@@ -752,8 +760,14 @@ IndexScanner *Table::find_index_for_scan(const DefaultConditionFilter &filter) {
     field_cond_desc = &filter.right();
     value_cond_desc = &filter.left();
   }
+
   if (field_cond_desc == nullptr || value_cond_desc == nullptr) {
     return nullptr;
+  }
+
+  //如果filter条件中含有null，那么不使用索引
+  if (field_cond_desc->value == nullptr || value_cond_desc->value == nullptr){
+      return nullptr;
   }
 
   const FieldMeta *field_meta = table_meta_.find_field_by_offset(field_cond_desc->attr_offset);

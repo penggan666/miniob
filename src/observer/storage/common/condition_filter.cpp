@@ -126,7 +126,6 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
       memcpy(right.value,&date_i, sizeof(date_i));
     }else if((!left.is_attr)&&type_left==CHARS&&right.is_attr&&type_right==DATES&&(date_i=dateToInt((char*)left.value))!=-1){
       memcpy(left.value,&date_i, sizeof(date_i));
-<<<<<<< HEAD
     }//TODO:add join 对多种数组类型增加判断
     else if(type_left==CHARS&&type_right==ARR_CHARS){
       type_left=ARR_CHARS;
@@ -135,23 +134,14 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
       type_left=ARR_INTS;
     }else if(type_left==FLOATS&&type_right==ARR_FLOATS){
       type_left=ARR_FLOATS;
+    }}else if(type_left == UNDEFINED || type_right == UNDEFINED) {
+      LOG_WARN("this is a null value compare");
     }
     else{
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
+    return init(left, right, type_left, condition.comp);
   }
-  
-=======
-    }else if(type_left == UNDEFINED || type_right == UNDEFINED) {
-      LOG_WARN("this is a null value compare");
-    }else{
-        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-    }
-    }
-
->>>>>>> master
-  return init(left, right, type_left, condition.comp);
-}
 
 bool DefaultConditionFilter::filter(const Record &rec) const
 {

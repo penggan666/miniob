@@ -758,8 +758,14 @@ IndexScanner *Table::find_index_for_scan(const DefaultConditionFilter &filter) {
     field_cond_desc = &filter.right();
     value_cond_desc = &filter.left();
   }
+
   if (field_cond_desc == nullptr || value_cond_desc == nullptr) {
     return nullptr;
+  }
+
+  //如果filter条件中含有null，那么不使用索引
+  if (field_cond_desc->value == nullptr || value_cond_desc->value == nullptr){
+      return nullptr;
   }
 
   const FieldMeta *field_meta = table_meta_.find_field_by_offset(field_cond_desc->attr_offset);

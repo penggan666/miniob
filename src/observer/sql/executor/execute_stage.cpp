@@ -373,14 +373,22 @@ void init_orderby(const char *db,const Selects &selects,const TupleSet& ts,std::
   }
 
 }
-void tupleSetToValue(Value &result,const TupleSet& ts,const CompOp& cp){
+RC tupleSetToValue(Value &result,const TupleSet& ts,const CompOp& cp){
+    RC rc = RC::SUCCESS;
+    if(ts.get_schema().fields().size()!=1){//排除错误情况: a>(1,2,3) 多列值的情况
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
     if(cp!=IN&&cp!=NOT_IN){//非in和not in就直接返回一个值, 第一行第一列
     const TupleField tf=ts.get_schema().field(0);
     result.type=tf.type();
     if(ts.is_empty()){//处理子查询结果为空的情况
         result.data= nullptr;
-        return;
+        return rc;
     }
+    if(ts.size()!=1){//排除错误情况: a>多行
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+        LOG_ERROR("ts.size(): %d",ts.size());
     const std::shared_ptr<TupleValue> tv=ts.get(0).values()[0];
     tv->get_real_value(result);
     //TODO: 注意日期应该转为string，回来需要补上
@@ -393,7 +401,7 @@ void tupleSetToValue(Value &result,const TupleSet& ts,const CompOp& cp){
       result.type=ARR_CHARS;
         if(ts.is_empty()){//处理子查询结果为空的情况
             result.data= nullptr;
-            return;
+            return rc;
         }
       result.data=malloc(sizeof(char*)*tuple_size+sizeof(size_t));//void->char**
       memcpy(result.data,&tuple_size,sizeof (tuple_size));//最前面保存数组大小
@@ -402,7 +410,7 @@ void tupleSetToValue(Value &result,const TupleSet& ts,const CompOp& cp){
       result.type=ARR_INTS;
         if(ts.is_empty()){//处理子查询结果为空的情况
             result.data= nullptr;
-            return;
+            return rc;
         }
       result.data=malloc(sizeof(int)*tuple_size+sizeof(size_t));
       memcpy(result.data,&tuple_size,sizeof (tuple_size));
@@ -411,7 +419,7 @@ void tupleSetToValue(Value &result,const TupleSet& ts,const CompOp& cp){
       result.type=ARR_FLOATS;
         if(ts.is_empty()){//处理子查询结果为空的情况
             result.data= nullptr;
-            return;
+            return rc;
         }
       result.data=malloc(sizeof(float)*tuple_size+sizeof(size_t));
       memcpy(result.data,&tuple_size,sizeof (tuple_size));
@@ -425,6 +433,7 @@ void tupleSetToValue(Value &result,const TupleSet& ts,const CompOp& cp){
       ts.tuples()[i].values()[0]->append_real_value(result,i);//只考虑第一列
     }
   }
+    return rc;
 }
 //根据select获取查询结果， 保存到result里
 RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &selects,TupleSet& result,int& is_mul_table){
@@ -446,7 +455,11 @@ RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &select
           return rc;
         }
         condition.left_is_attr=0;//改为value
-        tupleSetToValue(condition.left_value,sub_select_left,condition.comp);//将子查询改为可以正常使用的值
+        rc=tupleSetToValue(condition.left_value,sub_select_left,condition.comp);//将子查询改为可以正常使用的值
+          if (rc != RC::SUCCESS) {
+              LOG_ERROR("tupleSetToValue fail!!!\n");
+              return rc;
+          }
       }
       
       if(condition.right_is_attr&&condition.right_attr.sub_select_idx>-1){//右边属性是子查询
@@ -460,7 +473,11 @@ RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &select
           return rc;
         }
         condition.right_is_attr=0;//改为value
-        tupleSetToValue(condition.right_value,sub_select_right,condition.comp);//将子查询改为可以正常使用的值
+        rc=tupleSetToValue(condition.right_value,sub_select_right,condition.comp);//将子查询改为可以正常使用的值
+          if (rc != RC::SUCCESS) {
+              LOG_ERROR("tupleSetToValue fail!!!\n");
+              return rc;
+          }
       }
     }
   }    

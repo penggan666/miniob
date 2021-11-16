@@ -78,6 +78,7 @@ QUOTE            [\'\"]
 [Aa][Vv][Gg]							 RETURN_TOKEN(AVG);
 [Oo][Rr][Dd][Ee][Rr]					 RETURN_TOKEN(ORDER);//TODO: add order
 [Bb][Yy]                                 RETURN_TOKEN(BY);
+[Gg][Rr][Oo][Uu][Pp]                     RETURN_TOKEN(GROUP);//TODO: add GROUP
 [Aa][Ss][Cc]							 RETURN_TOKEN(ASC);
 [Ii][Nn][Nn][Ee][Rr]					 RETURN_TOKEN(INNER);//TODO: add inner join
 [Jj][Oo][Ii][Nn]                         RETURN_TOKEN(JOIN);

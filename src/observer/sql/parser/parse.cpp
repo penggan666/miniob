@@ -42,6 +42,15 @@ void order_attr_init(OrderAttr *order_attr, const char *relation_name, const cha
   order_attr->type = order_type;
   order_attr->attribute_name = strdup(attribute_name);
 }
+//TODO: add group group_attr_init
+void group_attr_init(GroupAttr *group_attr, const char *relation_name, const char *attribute_name){
+    if (relation_name != nullptr){
+        group_attr->relation_name = strdup(relation_name);
+    } else {
+        group_attr->relation_name = nullptr;
+    }
+    group_attr->attribute_name = strdup(attribute_name);
+}
 void relation_attr_destroy(RelAttr *relation_attr) {
   free(relation_attr->relation_name);
   free(relation_attr->attribute_name);
@@ -123,6 +132,10 @@ void selects_append_attribute(Selects *selects, RelAttr *rel_attr) {
 //TODO: add order selects_append_order
 void selects_append_order(Selects *selects, OrderAttr *order_attr) {
   selects->orderattrs[selects->order_num++] = *order_attr;
+}
+//TODO: add group selects_append_group
+void selects_append_group(Selects *selects, GroupAttr *group_attr) {
+    selects->groupattrs[selects->group_num++] = *group_attr;
 }
 void selects_append_relation(Selects *selects, const char *relation_name) {
   selects->relations[selects->relation_num++] = strdup(relation_name);

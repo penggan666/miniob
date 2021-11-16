@@ -370,8 +370,24 @@ void init_orderby(const char *db,const Selects &selects,const TupleSet& ts,std::
     order_field_indexs.push_back(schema.index_of_field(relation_name,attr_name));
     is_asc.push_back(oa.type==OASC);
   }
-
 }
+
+//TODO: add group
+void init_groupby(const char *db,const Selects &selects,const TupleSet& ts,std::vector<int>&group_field_indexs){
+    const TupleSchema &schema = ts.get_schema();
+    for(int i=selects.group_num-1;i>=0;i--){
+        const GroupAttr &ga = selects.groupattrs[i];
+        char *relation_name= nullptr;
+        char *attr_name=strdup(ga.attribute_name);
+        if(nullptr==ga.relation_name){
+            getTableNameByField(db,selects,relation_name,attr_name);
+        }else{
+            relation_name=strdup(ga.relation_name);
+        }
+        group_field_indexs.push_back(schema.index_of_field(relation_name,attr_name));
+    }
+}
+
 // 这里没有对输入的某些信息做合法性校验，比如查询的列名、where条件中的列名等，没有做必要的合法性校验
 // 需要补充上这一部分. 校验部分也可以放在resolve，不过跟execution放一起也没有关系
 RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_event) {
@@ -427,6 +443,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   //TODO: add order 根据select里order属性 获取对应属性在结果Tuple的index和排序方式(ASC或DESC)
   std::vector<int> order_field_indexs;
   std::vector<bool> is_asc;
+  std::vector<int> group_field_indexs;
   if (tuple_sets.size() > 1) {
     //TODO: add join 对tuple进行join操作
     // //初始化schema
@@ -454,76 +471,82 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
       init_orderby(db,selects,join_left_set,order_field_indexs,is_asc);
       join_left_set.sortTupleByOrder(order_field_indexs,is_asc);
     }
-    
-    join_left_set.print_rm_tmp(ss,realField);
+    //TODO: add group 如果有gropu by，那么需要分组
+    if(selects.group_num>0){
+        init_groupby(db,selects,tuple_sets.front(),group_field_indexs);
+        TupleSet groupTuple=join_left_set.groupbyTuple(group_field_indexs);
+        groupTuple.print_rm_tmp(ss,realField);
+    }else {
+        join_left_set.print_rm_tmp(ss, realField);
+    }
   } else {
     // 当前只查询一张表，直接返回结果即可
-    //TODO: 这里添加对聚合函数的处理,目前只做一张表的
-    Tuple tuple;
-    TupleSchema tupleSchema;
-    std::vector<TupleField> tuple_fileds=tuple_sets.front().get_schema().fields();
-    int count_star_flag=1;
-    for(int i=0;i<tuple_fileds.size();i++){
-        switch (tuple_fileds[i].aggregate_name()) {
-            case AGG_MIN:{
-                std::string const &min_field_name =
-                        std::string("MIN(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
-                tupleSchema.add(tuple_fileds[i].type(), tuple_fileds[i].table_name(), min_field_name.c_str(), AGG_MIN);
-                if (tuple_sets.front().size()>0)
-                    tuple.add(tuple_sets.front().minTuple(i)[i]);
-            }
-                break;
-            case AGG_MAX: {
-                std::string const &max_field_name =
-                        std::string("MAX(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
-                tupleSchema.add(tuple_fileds[i].type(), tuple_fileds[i].table_name(), max_field_name.c_str(), AGG_MAX);
-                if (tuple_sets.front().size()>0)
-                    tuple.add(tuple_sets.front().maxTuple(i)[i]);
-            }
-                break;
-            case AGG_COUNT:{
-                std::string const &count_field_name =
-                        std::string("COUNT(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
-                tupleSchema.add(INTS, tuple_fileds[i].table_name(), count_field_name.c_str(), AGG_COUNT);
-                tuple.add(tuple_sets.front().countTupleColumn(i),0);
-            }
-                break;
-            case AGG_COUNT_STAR:{
-                if (count_star_flag) {
-                    tupleSchema.add(INTS, tuple_fileds[i].table_name(), "COUNT(*)", AGG_COUNT);
-                    tuple.add(tuple_sets.front().countTupleStar(),0);
-                    count_star_flag=0;
-                }
-            }
-                break;
-            case AGG_AVG:{
-                std::string const &avg_field_name =
-                        std::string("AVG(") + std::string(tuple_fileds[i].field_name()) + std::string(")");
-                tupleSchema.add(FLOATS, tuple_fileds[i].table_name(), avg_field_name.c_str(), AGG_AVG);
-                if (tuple_sets.front().size()>0){
-                    float result = tuple_sets.front().avgTuple(i);
-                    if (result==-1)
-                        tuple.add(result,1);
-                    else
-                        tuple.add(result,0);
-                }
-            }
-            case AGG_NO:
-                break;
-        }
-    }
-    if (tupleSchema.fields().size()!=0){
-        TupleSet tupleSet;
-        if (tuple.size()>0)
-            tupleSet.add(std::move(tuple));
-        tupleSet.set_schema(tupleSchema);
-        tupleSet.print(ss);
+    if(selects.group_num>0){
+        init_groupby(db,selects,tuple_sets.front(),group_field_indexs);
+        TupleSet groupTuple=tuple_sets.front().groupbyTuple(group_field_indexs);
+        groupTuple.print(ss);
     }else {
-        if(selects.order_num>0){
-          init_orderby(db,selects,tuple_sets.front(),order_field_indexs,is_asc);
-          tuple_sets.front().sortTupleByOrder(order_field_indexs,is_asc);
+        //TODO: 这里添加对聚合函数的处理,目前只做一张表的
+        Tuple tuple;
+        TupleSchema tupleSchema;
+        std::vector<TupleField> tuple_fileds = tuple_sets.front().get_schema().fields();
+        int count_star_flag = 1;
+        for (int i = 0; i < tuple_fileds.size(); i++) {
+            switch (tuple_fileds[i].aggregate_name()) {
+                case AGG_MIN: {
+                    tupleSchema.add(tuple_fileds[i].type(), tuple_fileds[i].table_name(), tuple_fileds[i].field_name(),
+                                    AGG_MIN);
+                    if (tuple_sets.front().size() > 0)
+                        tuple.add(tuple_sets.front().minTuple(i)[i]);
+                }
+                    break;
+                case AGG_MAX: {
+                    tupleSchema.add(tuple_fileds[i].type(), tuple_fileds[i].table_name(), tuple_fileds[i].field_name(),
+                                    AGG_MAX);
+                    if (tuple_sets.front().size() > 0)
+                        tuple.add(tuple_sets.front().maxTuple(i)[i]);
+                }
+                    break;
+                case AGG_COUNT: {
+                    tupleSchema.add(INTS, tuple_fileds[i].table_name(), tuple_fileds[i].field_name(), AGG_COUNT);
+                    tuple.add(tuple_sets.front().countTupleColumn(i), 0);
+                }
+                    break;
+                case AGG_COUNT_STAR: {
+                    if (count_star_flag) {
+                        tupleSchema.add(INTS, tuple_fileds[i].table_name(), "*", AGG_COUNT);
+                        tuple.add(tuple_sets.front().countTupleStar(), 0);
+                        count_star_flag = 0;
+                    }
+                }
+                    break;
+                case AGG_AVG: {
+                    tupleSchema.add(FLOATS, tuple_fileds[i].table_name(), tuple_fileds[i].field_name(), AGG_AVG);
+                    if (tuple_sets.front().size() > 0) {
+                        float result = tuple_sets.front().avgTuple(i);
+                        if (result == -1)
+                            tuple.add(result, 1);
+                        else
+                            tuple.add(result, 0);
+                    }
+                }
+                case AGG_NO:
+                    break;
+            }
         }
-        tuple_sets.front().print(ss);
+        if (tupleSchema.fields().size() != 0) {
+            TupleSet tupleSet;
+            if (tuple.size() > 0)
+                tupleSet.add(std::move(tuple));
+            tupleSet.set_schema(tupleSchema);
+            tupleSet.print(ss);
+        } else {
+            if (selects.order_num > 0) {
+                init_orderby(db, selects, tuple_sets.front(), order_field_indexs, is_asc);
+                tuple_sets.front().sortTupleByOrder(order_field_indexs, is_asc);
+            }
+            tuple_sets.front().print(ss);
+        }
     }
   }
 

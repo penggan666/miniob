@@ -59,6 +59,12 @@ typedef struct {
   OrderType type; //升序 ASC 降序 DESC 
 } OrderAttr;
 
+//TODO: add group struct GroupAttr
+typedef struct {
+    char *relation_name;
+    char *attribute_name;
+} GroupAttr;
+
 //属性值类型
 typedef enum { UNDEFINED, CHARS, INTS, FLOATS, DATES } AttrType;
 
@@ -91,6 +97,9 @@ typedef struct {
   //TODO: add order struct Selects
   size_t    order_num;
   OrderAttr orderattrs[MAX_NUM];
+  //TODO: add group struct Selects
+  size_t    group_num;
+  GroupAttr groupattrs[MAX_NUM];
 } Selects;
 
 // struct of insert

@@ -80,6 +80,19 @@ public:
   const int aggregate_name() const{
       return aggregate_name_;
   }
+  const char *aggregate_name_str() const{
+      switch (aggregate_name_) {
+          case AGG_COUNT_STAR:
+          case AGG_COUNT:
+              return "COUNT";
+          case AGG_MAX:
+              return "MAX";
+          case AGG_MIN:
+              return "MIN";
+          case AGG_AVG:
+              return "AVG";
+      }
+  }
 
   std::string to_string() const;
 private:
@@ -153,6 +166,7 @@ public:
 
   //TODO: add order 根据多列进行排序
   void sortTupleByOrder(const std::vector<int> &fieldIndex, const std::vector<bool> & isAsc);
+  TupleSet groupbyTuple(const std::vector<int> &fieldIndex);
   bool is_empty() const;
   int size() const;
   const Tuple &get(int index) const;

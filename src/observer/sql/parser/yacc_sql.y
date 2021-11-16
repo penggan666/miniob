@@ -109,6 +109,7 @@ ParserContext *get_context(yyscan_t scanner)
         GE
         NE
 		ORDER
+		GROUP
 		BY
 		ASC
 		INNER
@@ -390,7 +391,7 @@ update:			/*  update 语句的语法解析树*/
 		}
     ;
 select:				/*  select 语句的语法解析树*/
-    SELECT select_attr FROM ID rel_list where order SEMICOLON
+    SELECT select_attr FROM ID rel_list where group order SEMICOLON
 		{
 			// CONTEXT->ssql->sstr.selection.relations[CONTEXT->from_length++]=$4;
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
@@ -407,6 +408,38 @@ select:				/*  select 语句的语法解析树*/
 			CONTEXT->value_length = 0;
 	}
 	;
+group:
+    /* empty */
+    | GROUP BY group_attr{
+    //TODO: add group
+    }
+    ;
+group_attr:
+    ID group_list{
+        GroupAttr attr;
+        group_attr_init(&attr,NULL,$1);
+        selects_append_group(&CONTEXT->ssql->sstr.selection,&attr);
+    }
+    | ID DOT ID group_list{
+        GroupAttr attr;
+        group_attr_init(&attr,$1,$3);
+        selects_append_group(&CONTEXT->ssql->sstr.selection,&attr);
+    }
+    ;
+
+group_list:
+    /* empty */
+    | COMMA ID group_list{
+        GroupAttr attr;
+        group_attr_init(&attr,NULL,$2);
+        selects_append_group(&CONTEXT->ssql->sstr.selection,&attr);
+    }
+    | COMMA ID DOT ID group_list{
+        GroupAttr attr;
+        group_attr_init(&attr,$2,$4);
+        selects_append_group(&CONTEXT->ssql->sstr.selection,&attr);
+    }
+
 
 order:
 	/* empty */
@@ -486,7 +519,7 @@ select_attr:
 			relation_attr_init(&attr, NULL, "*", 0);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 		}
-    | ID attr_list {
+    | ID attr_list{
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, $1, 0);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
@@ -496,7 +529,6 @@ select_attr:
 			relation_attr_init(&attr, $1, $3, 0);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 		}
-	
 	| ID DOT STAR attr_list{// add t1.*
 			RelAttr attr;
 			relation_attr_init(&attr, $1, "*", 0);
@@ -504,55 +536,55 @@ select_attr:
 	}
 
 	//TODO: 添加对聚合函数的解析
-	| COUNT LBRACE STAR RBRACE agg_list{// add COUNT(*)
+	| COUNT LBRACE STAR RBRACE attr_list{// add COUNT(*)
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, "*", 5);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	}
 
-	| COUNT LBRACE ID RBRACE agg_list{// add COUNT(id)
+	| COUNT LBRACE ID RBRACE attr_list{// add COUNT(id)
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, $3, 1);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	} 
 
-	| COUNT LBRACE ID DOT ID RBRACE agg_list{// add COUNT(t.id)
+	| COUNT LBRACE ID DOT ID RBRACE attr_list{// add COUNT(t.id)
 			RelAttr attr;
 			relation_attr_init(&attr, $3, $5, 1);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	}
 
-	| MAX LBRACE ID RBRACE agg_list{// add MAX(id)
+	| MAX LBRACE ID RBRACE attr_list{// add MAX(id)
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, $3, 2);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	} 
 
-	| MAX LBRACE ID DOT ID RBRACE agg_list{// add MAX(t.id)
+	| MAX LBRACE ID DOT ID RBRACE attr_list{// add MAX(t.id)
 			RelAttr attr;
 			relation_attr_init(&attr, $3, $5, 2);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	}
 
-	| MIN LBRACE ID RBRACE agg_list{// add MIN(id)
+	| MIN LBRACE ID RBRACE attr_list{// add MIN(id)
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, $3, 3);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	} 
 
-	| MIN LBRACE ID DOT ID RBRACE agg_list{// add MIN(t.id)
+	| MIN LBRACE ID DOT ID RBRACE attr_list{// add MIN(t.id)
 			RelAttr attr;
 			relation_attr_init(&attr, $3, $5, 3);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	}
 
-	| AVG LBRACE ID RBRACE agg_list{// add AVG(id)
+	| AVG LBRACE ID RBRACE attr_list{// add AVG(id)
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, $3, 4);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	} 
 
-	| AVG LBRACE ID DOT ID RBRACE agg_list{// add AVG(t.id)
+	| AVG LBRACE ID DOT ID RBRACE attr_list{// add AVG(t.id)
 			RelAttr attr;
 			relation_attr_init(&attr, $3, $5, 4);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
@@ -576,64 +608,60 @@ attr_list:
         // CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length].attribute_name=$4;
         // CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length++].relation_name=$2;
   	  }
-  	;
-
-agg_list:
-	/* empty */
-	| COMMA COUNT LBRACE STAR RBRACE agg_list{// add COUNT(*)
+	| COMMA COUNT LBRACE STAR RBRACE attr_list{// add COUNT(*)
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, "*", 5);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	}
 
-	| COMMA COUNT LBRACE ID RBRACE agg_list{// add COUNT(id)
+	| COMMA COUNT LBRACE ID RBRACE attr_list{// add COUNT(id)
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, $4, 1);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	} 
 
-	| COMMA COUNT LBRACE ID DOT ID RBRACE agg_list{// add COUNT(t.id)
+	| COMMA COUNT LBRACE ID DOT ID RBRACE attr_list{// add COUNT(t.id)
 			RelAttr attr;
 			relation_attr_init(&attr, $4, $6, 1);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	}
 
-	| COMMA MAX LBRACE ID RBRACE agg_list{// add MAX(id)
+	| COMMA MAX LBRACE ID RBRACE attr_list{// add MAX(id)
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, $4, 2);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	} 
 
-	| COMMA MAX LBRACE ID DOT ID RBRACE agg_list{// add MAX(t.id)
+	| COMMA MAX LBRACE ID DOT ID RBRACE attr_list{// add MAX(t.id)
 			RelAttr attr;
 			relation_attr_init(&attr, $4, $6, 2);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	}
 
-	| COMMA MIN LBRACE ID RBRACE agg_list{// add MIN(id)
+	| COMMA MIN LBRACE ID RBRACE attr_list{// add MIN(id)
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, $4, 3);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	} 
 
-	| COMMA MIN LBRACE ID DOT ID RBRACE agg_list{// add MIN(t.id)
+	| COMMA MIN LBRACE ID DOT ID RBRACE attr_list{// add MIN(t.id)
 			RelAttr attr;
 			relation_attr_init(&attr, $4, $6, 3);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	}
 
-	| COMMA AVG LBRACE ID RBRACE agg_list{// add AVG(id)
+	| COMMA AVG LBRACE ID RBRACE attr_list{// add AVG(id)
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, $4, 4);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	} 
 
-	| COMMA AVG LBRACE ID DOT ID RBRACE agg_list{// add AVG(t.id)
+	| COMMA AVG LBRACE ID DOT ID RBRACE attr_list{// add AVG(t.id)
 			RelAttr attr;
 			relation_attr_init(&attr, $4, $6, 4);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
-	}
-	;
+	}		
+  	;
 
 rel_list:
 /* empty */

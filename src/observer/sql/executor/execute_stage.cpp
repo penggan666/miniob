@@ -436,9 +436,59 @@ RC tupleSetToValue(Value &result,const TupleSet& ts,const CompOp& cp){
     return rc;
 }
 bool hasRelationOfCondition(char* f_relation,Selects& selects){//判断select的condition是否含有某个表
-
+    for(const Condition& con:selects.conditions){
+        if(con.left_is_attr&&con.left_attr.relation_name!= nullptr&& strcmp(con.left_attr.relation_name,f_relation)==0){
+            return true;
+        }
+        if(con.right_is_attr&&con.right_attr.relation_name!= nullptr&& strcmp(con.right_attr.relation_name,f_relation)==0){
+            return true;
+        }
+    }
+    return false;
 }
-void connect_sub_father(char* f_relation,const TupleSchema & ts,const Tuple& tp,Condition& con,const Selects& sts){
+//将比较条件中的某个字段转为对应值
+void attr_to_value(char* f_relation,char*attribute_name,const TupleSchema & ts,const Tuple& tp,Value& value,int& is_attr){
+    size_t col_index=ts.index_of_field(f_relation,attribute_name);
+    const TupleValue &tv=tp.get(col_index);//获取对应字段值
+    //将属性替换为值
+    Value tmp_v;
+    tmp_v.type=ts.field(col_index).type();
+    tv.get_real_value(tmp_v);
+    value=tmp_v;
+    is_attr=0;//改为value
+}
+//将子查询中使用到的父表字段赋值为value
+void connect_sub_father(char* f_relation,const TupleSchema & ts,const Tuple& tp,Selects& sts){
+    for(size_t i=0;i<sts.condition_num;i++){
+        Condition &con=sts.conditions[i];
+        if(con.left_is_attr&&con.left_attr.relation_name!= nullptr&& strcmp(con.left_attr.relation_name,f_relation)==0){
+            attr_to_value(f_relation,con.left_attr.attribute_name,ts,tp,con.left_value,con.left_is_attr);
+        }
+        if(con.right_is_attr&&con.right_attr.relation_name!= nullptr&& strcmp(con.right_attr.relation_name,f_relation)==0){
+            attr_to_value(f_relation,con.right_attr.attribute_name,ts,tp,con.right_value,con.right_is_attr);
+        }
+        LOG_ERROR("con right: %d value:%d",con.right_is_attr,*(int*)con.right_value.data);
+    }
+}
+//是否是可用的tuple
+bool isRightTuple(const char *db,char* f_relation,const TupleSchema &ts,const Tuple& tp,Condition& con){
+    Table * table = DefaultHandler::get_default().find_table(db, f_relation);
+    //注意经过前面步骤的替换, 此时我们将con中子查询已经替换为value了,我们在将Condition中父表的字段(如果是)替换为value, 则只剩两个value比较了
+    if(con.left_is_attr){
+        attr_to_value(f_relation,con.left_attr.attribute_name,ts,tp,con.left_value,con.left_is_attr);
+    }
+    if(con.right_is_attr){
+        attr_to_value(f_relation,con.right_attr.attribute_name,ts,tp,con.right_value,con.right_is_attr);
+    }
+    //此时condition已经变为一个值与值的比较
+    DefaultConditionFilter* conditionFilter=new DefaultConditionFilter();
+    RC rc=conditionFilter->init(*table,con);
+    Record rd;//因为两边都已经是值, 所以该参数不会被使用, 可以为空
+    if(conditionFilter->filter(rd)){
+        return true;
+    }else{
+        return false;
+    }
 
 }
 //根据select获取查询结果， 保存到result里
@@ -568,34 +618,61 @@ RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &select
     if(!hasFatherCon.empty()){
         TupleSet newTS;//存放新的tuple
         TupleSet &ts_raw=tuple_sets.front();
+        newTS.set_schema(ts_raw.get_schema());//注意复制元数据
+        LOG_ERROR("ts_raw.tuples().size():%d\n",ts_raw.tuples().size());
         for(const Tuple& tp:ts_raw.tuples()){//遍历每一条记录
+            bool right_tuple= true;
             //对含有父表字段的conditon进行处理
             for(size_t i=noFatherCon.size();i<noFatherCon.size()+hasFatherCon.size();i++){
-                Condition& con=selects.conditions[i];
-                //将condititon中子查询中相关条件字段赋值为对应value
-                connect_sub_father(f_relation,ts_raw.get_schema(),tp,con,selects);
+                Condition con=selects.conditions[i];
                 //执行condition中的子查询
                 if(con.left_is_attr&&con.left_attr.sub_select_idx>-1){//左边属性是子查询
+                    //获取对应子查询的拷贝 注意不能用引用, 因为原始子查询select需要重复使用
+                    Selects  selects1=selects.sub_select[con.left_attr.sub_select_idx];
+                    //将condititon中子查询中相关条件字段赋值为对应value
+                    connect_sub_father(f_relation,ts_raw.get_schema(),tp,selects1);
                     TupleSet sub_select_left;
                     int tmp;//注意子查询用不到, 只有第一层需要判断是否是多表查询, 来进行输出
-                    rc=selectToTupleSet(db, session_event, selects.sub_select[con.left_attr.sub_select_idx],sub_select_left,tmp);//获取子查询结果
+                    rc=selectToTupleSet(db, session_event, selects1,sub_select_left,tmp);//获取子查询结果
                     con.left_is_attr=0;//改为value
                     rc=tupleSetToValue(con.left_value,sub_select_left,con.comp);//将子查询改为可以正常使用的值
                 }
-                if(con.right_is_attr&&con.right_attr.sub_select_idx>-1){//左边属性是子查询
-                    TupleSet sub_select_left;
+                if(con.right_is_attr&&con.right_attr.sub_select_idx>-1){//右边属性是子查询
+                    //获取对应子查询的拷贝 注意不能用引用, 因为原始子查询select需要重复使用
+                    Selects  selects1=selects.sub_select[con.right_attr.sub_select_idx];//拷贝 不是引用
+                    //将condititon中子查询中相关条件字段赋值为对应value
+                    connect_sub_father(f_relation,ts_raw.get_schema(),tp,selects1);
+                    TupleSet sub_select_right;
                     int tmp;//注意子查询用不到, 只有第一层需要判断是否是多表查询, 来进行输出
-                    rc=selectToTupleSet(db, session_event, selects.sub_select[con.left_attr.sub_select_idx],sub_select_left,tmp);//获取子查询结果
-                    con.left_is_attr=0;//改为value
-                    rc=tupleSetToValue(con.left_value,sub_select_left,con.comp);//将子查询改为可以正常使用的值
+                    rc=selectToTupleSet(db, session_event, selects1,sub_select_right,tmp);//获取子查询结果
+                    con.right_is_attr=0;//改为value
+                    rc=tupleSetToValue(con.right_value,sub_select_right,con.comp);//将子查询改为可以正常使用的值
                 }
+                //使用处理好的condition判断Tuple是否有效
+                if(!isRightTuple(db,f_relation,ts_raw.get_schema(),tp,con)){
+                    right_tuple= false;
+                    break;
+                }
+
             }
-
-
+            LOG_ERROR("filter tuple!!!\n");
+            if(right_tuple){
+                LOG_ERROR("right tuple-----\n");
+                //复制
+                Tuple tmp;
+                for(const std::shared_ptr<TupleValue>& t:tp.values()){
+                    tmp.add(t);
+                }
+                newTS.add(std::move(tmp));
+            }
         }
+        //将筛选后得到的新Tupleset插入到Tuplesets, 并将原本的删除
+        auto k = tuple_sets.begin();
+        tuple_sets.erase(k);
+        tuple_sets.insert(tuple_sets.begin(),std::move(newTS));
     }
 
-
+    LOG_ERROR("tuple_sets.size():%d",tuple_sets.size());
   //对多个单表查询的结果进行处理, 并赋值给result
   if (tuple_sets.size() > 1) {
     is_mul_table=1;

@@ -450,11 +450,17 @@ RC tupleSetToValue(Value &result,const TupleSet& ts,const CompOp& cp){
     return rc;
 }
 bool hasRelationOfCondition(char* f_relation,Selects& selects){//判断select的condition是否含有某个表
-    for(const Condition& con:selects.conditions){
-        if(con.left_is_attr&&con.left_attr.relation_name!= nullptr&& strcmp(con.left_attr.relation_name,f_relation)==0){
+    //注意要递归查询, 子查询的子查询存在父表字段,则整个链路都不能使用
+    for(size_t i=0;i<selects.condition_num;i++){
+        const Condition& con=selects.conditions[i];
+        if(con.left_is_attr&&con.left_attr.sub_select_idx>-1){//递归子查询
+            return hasRelationOfCondition(f_relation,selects.sub_select[con.left_attr.sub_select_idx]);
+        }else if(con.left_is_attr&&con.left_attr.relation_name!= nullptr&& strcmp(con.left_attr.relation_name,f_relation)==0){
             return true;
         }
-        if(con.right_is_attr&&con.right_attr.relation_name!= nullptr&& strcmp(con.right_attr.relation_name,f_relation)==0){
+        if(con.right_is_attr&&con.right_attr.sub_select_idx>-1){
+            return hasRelationOfCondition(f_relation,selects.sub_select[con.right_attr.sub_select_idx]);
+        }else if(con.right_is_attr&&con.right_attr.relation_name!= nullptr&& strcmp(con.right_attr.relation_name,f_relation)==0){
             return true;
         }
     }
@@ -473,12 +479,18 @@ void attr_to_value(char* f_relation,char*attribute_name,const TupleSchema & ts,c
 }
 //将子查询中使用到的父表字段赋值为value
 void connect_sub_father(char* f_relation,const TupleSchema & ts,const Tuple& tp,Selects& sts){
+    //递归的复制
     for(size_t i=0;i<sts.condition_num;i++){
         Condition &con=sts.conditions[i];
-        if(con.left_is_attr&&con.left_attr.relation_name!= nullptr&& strcmp(con.left_attr.relation_name,f_relation)==0){
+        if(con.left_is_attr&&con.left_attr.sub_select_idx>-1){//左属性是子查询
+            connect_sub_father(f_relation,ts,tp,sts.sub_select[con.left_attr.sub_select_idx]);
+        }else if(con.left_is_attr&&con.left_attr.relation_name!= nullptr&& strcmp(con.left_attr.relation_name,f_relation)==0){
             attr_to_value(f_relation,con.left_attr.attribute_name,ts,tp,con.left_value,con.left_is_attr);
         }
-        if(con.right_is_attr&&con.right_attr.relation_name!= nullptr&& strcmp(con.right_attr.relation_name,f_relation)==0){
+
+        if(con.right_is_attr&&con.right_attr.sub_select_idx>-1){//左属性是子查询
+            connect_sub_father(f_relation,ts,tp,sts.sub_select[con.right_attr.sub_select_idx]);
+        }else if(con.right_is_attr&&con.right_attr.relation_name!= nullptr&& strcmp(con.right_attr.relation_name,f_relation)==0){
             attr_to_value(f_relation,con.right_attr.attribute_name,ts,tp,con.right_value,con.right_is_attr);
         }
         LOG_ERROR("con right: %d value:%d",con.right_is_attr,*(int*)con.right_value.data);

@@ -493,7 +493,6 @@ void connect_sub_father(char* f_relation,const TupleSchema & ts,const Tuple& tp,
         }else if(con.right_is_attr&&con.right_attr.relation_name!= nullptr&& strcmp(con.right_attr.relation_name,f_relation)==0){
             attr_to_value(f_relation,con.right_attr.attribute_name,ts,tp,con.right_value,con.right_is_attr);
         }
-        LOG_ERROR("con right: %d value:%d",con.right_is_attr,*(int*)con.right_value.data);
     }
 }
 //是否是可用的tuple
@@ -514,6 +513,16 @@ bool isRightTuple(const char *db,char* f_relation,const TupleSchema &ts,const Tu
         return true;
     }else{
         return false;
+    }
+
+}
+void copySelect(Selects& selects,const Selects& raw){
+    selects=raw;
+    if(raw.sub_num>0){
+        selects.sub_select=(Selects *)(malloc(sizeof(Selects)*MAX_NUM));
+        for(size_t i=0;i<raw.sub_num;i++){
+            copySelect(selects.sub_select[i],raw.sub_select[i]);
+        }
     }
 
 }
@@ -654,9 +663,11 @@ RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &select
                 //执行condition中的子查询
                 if(con.left_is_attr&&con.left_attr.sub_select_idx>-1){//左边属性是子查询
                     //获取对应子查询的拷贝 注意不能用引用, 因为原始子查询select需要重复使用
-                    Selects  selects1=selects.sub_select[con.left_attr.sub_select_idx];
+                    Selects  selects1;
+                    copySelect(selects1,selects.sub_select[con.left_attr.sub_select_idx]);
                     //将condititon中子查询中相关条件字段赋值为对应value
                     connect_sub_father(f_relation,ts_raw.get_schema(),tp,selects1);
+                    LOG_ERROR("connect_sub_father left!!!\n");
                     TupleSet sub_select_left;
                     int tmp;//注意子查询用不到, 只有第一层需要判断是否是多表查询, 来进行输出
                     rc=selectToTupleSet(db, session_event, selects1,sub_select_left,tmp);//获取子查询结果
@@ -665,9 +676,11 @@ RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &select
                 }
                 if(con.right_is_attr&&con.right_attr.sub_select_idx>-1){//右边属性是子查询
                     //获取对应子查询的拷贝 注意不能用引用, 因为原始子查询select需要重复使用
-                    Selects  selects1=selects.sub_select[con.right_attr.sub_select_idx];//拷贝 不是引用
+                    Selects  selects1;//拷贝 不是引用
+                    copySelect(selects1,selects.sub_select[con.right_attr.sub_select_idx]);
                     //将condititon中子查询中相关条件字段赋值为对应value
                     connect_sub_father(f_relation,ts_raw.get_schema(),tp,selects1);
+                    LOG_ERROR("connect_sub_father right!!!\n");
                     TupleSet sub_select_right;
                     int tmp;//注意子查询用不到, 只有第一层需要判断是否是多表查询, 来进行输出
                     rc=selectToTupleSet(db, session_event, selects1,sub_select_right,tmp);//获取子查询结果

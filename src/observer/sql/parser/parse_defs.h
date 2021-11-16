@@ -154,11 +154,17 @@ typedef struct {
   char *relation_name;  // Relation name
 } DropTable;
 
+// TODO: 添加多列索引信息
+typedef struct {
+    char *column_name;
+} IndexColumn;
+
 // struct of create_index
 typedef struct {
   char *index_name;      // Index name
   char *relation_name;   // Relation name
-  char *attribute_name;  // Attribute name
+  size_t column_counts;
+  IndexColumn attribute_names[MAX_NUM];  // Attribute name
   int is_unique;         // is_unique(1) or not(0)
 } CreateIndex;
 
@@ -265,7 +271,7 @@ void drop_table_init(DropTable *drop_table, const char *relation_name);
 void drop_table_destroy(DropTable *drop_table);
 
 void create_index_init(
-    CreateIndex *create_index, const char *index_name, const char *relation_name, const char *attr_name, const int is_unique);
+    CreateIndex *create_index, const char *index_name, const char *relation_name, const int is_unique);
 void create_index_destroy(CreateIndex *create_index);
 
 void drop_index_init(DropIndex *drop_index, const char *index_name);

@@ -135,12 +135,12 @@ RC DefaultHandler::drop_table(const char *dbname, const char *relation_name) {
   return db->drop_table(relation_name);
 }
 
-RC DefaultHandler::create_index(Trx *trx, const char *dbname, const char *relation_name, const char *index_name, const char *attribute_name, const int is_unique) {
+RC DefaultHandler::create_index(Trx *trx, const char *dbname, const char *relation_name, const char *index_name, int columns_count, const IndexColumn *attribute_names, const int is_unique) {
   Table *table = find_table(dbname, relation_name);
   if (nullptr == table) {
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
-  return table->create_index(trx, index_name, attribute_name, is_unique);
+  return table->create_index(trx, index_name, columns_count,attribute_names, is_unique);
 }
 
 RC DefaultHandler::drop_index(Trx *trx, const char *dbname, const char *relation_name, const char *index_name) {

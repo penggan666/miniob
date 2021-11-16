@@ -29,6 +29,8 @@ public:
   virtual void to_string(std::ostream &os) const = 0;
   virtual int compare(const TupleValue &other) const = 0;
   virtual void get_value(float &value) const=0;
+  virtual void get_real_value(Value& value)const=0;
+  virtual void append_real_value(Value& value,size_t offset)const=0;
   virtual int get_is_null() const=0;
 private:
 };
@@ -59,6 +61,16 @@ public:
 
   void get_value(float &value) const override {
       value=(float)value_;
+  }
+  void get_real_value(Value& value)const override{
+      value.data= malloc(sizeof (value_));
+      memcpy(value.data,&value_,sizeof (value_));
+  }
+  void append_real_value(Value& value,size_t offset)const override{
+    //注意需要跳过最前面存储size的空间
+    char* tmp=(char*)value.data;
+    tmp=tmp+sizeof(size_t);
+    memcpy((int*)tmp+offset,&value_,sizeof(value_));
   }
 
   int get_is_null() const override{
@@ -106,6 +118,16 @@ public:
   void get_value(float &value) const override {
         value=value_;
   }
+  void get_real_value(Value& value)const override{
+      value.data= malloc(sizeof (value_));
+      memcpy(value.data,&value_,sizeof (value_));
+  }
+  void append_real_value(Value& value,size_t offset)const override{
+    //注意需要跳过最前面存储size的空间
+    char* tmp=(char*)value.data;
+    tmp=tmp+sizeof(size_t);
+    memcpy((float*)tmp+offset,&value_,sizeof(value_));
+  }
 
   int get_is_null() const override{
       return is_null_;
@@ -144,6 +166,14 @@ public:
 
   void get_value(float &value) const override {
       value=0.0;
+  }
+  void get_real_value(Value& value)const override{
+      value.data=strdup(value_.c_str());
+  }
+  void append_real_value(Value& value,size_t offset)const override{
+    char* tmp=(char*)value.data;
+    tmp=tmp+sizeof(size_t);
+    ((char**)tmp)[offset]=strdup(value_.c_str());
   }
 
   int get_is_null() const override{

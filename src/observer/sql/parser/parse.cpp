@@ -31,6 +31,16 @@ void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const
   
   relation_attr->aggregate_name = aggregate_name;
   relation_attr->attribute_name = strdup(attribute_name);
+  //TODO: add sub query 非子查询
+  relation_attr->sub_select_idx=-1;
+  
+}
+//TODO: add sub query初始化子查询
+void relation_attr_init_query(RelAttr *relation_attr, int aggregate_name,int sub_select_idx) {
+  relation_attr->relation_name = nullptr;
+  relation_attr->aggregate_name = aggregate_name;
+  relation_attr->attribute_name = "sub_select";
+  relation_attr->sub_select_idx=sub_select_idx;
 }
 //TODO: add order order_attr_init
 void order_attr_init(OrderAttr *order_attr, const char *relation_name, const char *attribute_name, OrderType order_type) {
@@ -91,7 +101,6 @@ void condition_init(Condition *condition, CompOp comp,
     condition->left_attr = *left_attr;
   } else {
     condition->left_value = *left_value;
-    printf("%d\n",right_is_attr);
   }
 
   condition->right_is_attr = right_is_attr;
@@ -128,6 +137,7 @@ void attr_info_destroy(AttrInfo *attr_info) {
 void selects_init(Selects *selects, ...);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr) {
   selects->attributes[selects->attr_num++] = *rel_attr;
+  
 }
 //TODO: add order selects_append_order
 void selects_append_order(Selects *selects, OrderAttr *order_attr) {
@@ -140,7 +150,10 @@ void selects_append_group(Selects *selects, GroupAttr *group_attr) {
 void selects_append_relation(Selects *selects, const char *relation_name) {
   selects->relations[selects->relation_num++] = strdup(relation_name);
 }
-
+//TODO: add subquery selects_append_condition
+void selects_append_condition(Selects *selects, Condition* condition) {
+  selects->conditions[selects->condition_num++]=*condition;
+}
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num) {
   assert(condition_num <= sizeof(selects->conditions)/sizeof(selects->conditions[0]));
   for (size_t i = 0; i < condition_num; i++) {
@@ -148,7 +161,13 @@ void selects_append_conditions(Selects *selects, Condition conditions[], size_t 
   }
   selects->condition_num = condition_num;
 }
-
+//TODO: add subquery
+Selects* to_subquery(Selects* res,int dep,int* path_to_sub){
+	for(size_t i=0;i<dep;i++){//定位到遇到的子查询的父查询
+		res=&res->sub_select[path_to_sub[i]];
+	}
+  return res;
+}
 void selects_destroy(Selects *selects) {
   for (size_t i = 0; i < selects->attr_num; i++) {
     relation_attr_destroy(&selects->attributes[i]);

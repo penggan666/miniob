@@ -435,15 +435,30 @@ RC tupleSetToValue(Value &result,const TupleSet& ts,const CompOp& cp){
   }
     return rc;
 }
+bool hasRelationOfCondition(char* f_relation,Selects& selects){//判断select的condition是否含有某个表
+
+}
+void connect_sub_father(char* f_relation,const TupleSchema & ts,const Tuple& tp,Condition& con,const Selects& sts){
+
+}
 //根据select获取查询结果， 保存到result里
 RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &selects,TupleSet& result,int& is_mul_table){
     RC rc = RC::SUCCESS;
   Session *session = session_event->get_client()->session;
   Trx *trx = session->current_trx();
+    //TODO: add complex query: 暂时不处理含有与父查询关联的子查询的condition
+    char* f_relation=selects.relations[0];//暂时只考虑父查询只有一个表的
+    std::vector<size_t> noFatherCon;//无父查询表的condition
+    std::vector<size_t> hasFatherCon;//存在父查询表的condition
   if(selects.sub_num>0){//如果存在子查询
     for(size_t i=0;i<selects.condition_num;i++){//遍历所有condition, 将其中的子查询修改为可以正常使用的值
       Condition &condition = selects.conditions[i];
       if(condition.left_is_attr&&condition.left_attr.sub_select_idx>-1){//左边属性是子查询
+        //判断是否存在父查询表
+        if(hasRelationOfCondition(f_relation,selects.sub_select[condition.left_attr.sub_select_idx])){
+            hasFatherCon.push_back(i);
+            break;
+        }
         //根据比较符号非in或notin 可以知道应该为单个值
         TupleSet sub_select_left;
         int tmp;//注意子查询用不到, 只有第一层需要判断是否是多表查询, 来进行输出
@@ -463,6 +478,11 @@ RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &select
       }
       
       if(condition.right_is_attr&&condition.right_attr.sub_select_idx>-1){//右边属性是子查询
+          //判断是否存在父查询表
+          if(hasRelationOfCondition(f_relation,selects.sub_select[condition.right_attr.sub_select_idx])){
+              hasFatherCon.push_back(i);
+              break;
+          }
         TupleSet sub_select_right;
         int tmp;
         rc=selectToTupleSet(db, session_event, selects.sub_select[condition.right_attr.sub_select_idx],sub_select_right,tmp);//获取子查询结果
@@ -479,8 +499,27 @@ RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &select
               return rc;
           }
       }
+      //无父查询
+      noFatherCon.push_back(i);
     }
-  }    
+  }
+  //TODO: add complex query:先只使用无父查询的conditon进行查询得到结果
+  if(!hasFatherCon.empty()){
+      Condition new_con[MAX_NUM];//让前半部分为 有父查询表con 后半部分为 无父查询表con
+      for(size_t i=0;i<noFatherCon.size();i++){
+          new_con[i]=selects.conditions[noFatherCon[i]];
+      }
+      for(size_t i=noFatherCon.size(),j=0;i<selects.condition_num;i++,j++){
+          new_con[i]=selects.conditions[hasFatherCon[j]];
+      }
+      //重新赋值
+      for(size_t i=0;i<selects.condition_num;i++){
+          selects.conditions[i]=new_con[i];
+      }
+      //暂时只处理无父查询的con
+      selects.condition_num=noFatherCon.size();
+  }
+
   // 把所有的表和只跟这张表关联的condition都拿出来，生成最底层的select 执行节点
   std::vector<SelectExeNode *> select_nodes;
   for (size_t i = 0; i < selects.relation_num; i++) {
@@ -525,6 +564,38 @@ RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &select
     }
   }
   LOG_ERROR("execute success!!!\n");
+    //TODO: add complex sub query: 对复杂化子查询与父查询无关联的condition处理完后的结果，按每一条过滤，例如一条(id:1,age:2),子查询有sub.id=fa.id,将fa.id替换成value:1
+    if(!hasFatherCon.empty()){
+        TupleSet newTS;//存放新的tuple
+        TupleSet &ts_raw=tuple_sets.front();
+        for(const Tuple& tp:ts_raw.tuples()){//遍历每一条记录
+            //对含有父表字段的conditon进行处理
+            for(size_t i=noFatherCon.size();i<noFatherCon.size()+hasFatherCon.size();i++){
+                Condition& con=selects.conditions[i];
+                //将condititon中子查询中相关条件字段赋值为对应value
+                connect_sub_father(f_relation,ts_raw.get_schema(),tp,con,selects);
+                //执行condition中的子查询
+                if(con.left_is_attr&&con.left_attr.sub_select_idx>-1){//左边属性是子查询
+                    TupleSet sub_select_left;
+                    int tmp;//注意子查询用不到, 只有第一层需要判断是否是多表查询, 来进行输出
+                    rc=selectToTupleSet(db, session_event, selects.sub_select[con.left_attr.sub_select_idx],sub_select_left,tmp);//获取子查询结果
+                    con.left_is_attr=0;//改为value
+                    rc=tupleSetToValue(con.left_value,sub_select_left,con.comp);//将子查询改为可以正常使用的值
+                }
+                if(con.right_is_attr&&con.right_attr.sub_select_idx>-1){//左边属性是子查询
+                    TupleSet sub_select_left;
+                    int tmp;//注意子查询用不到, 只有第一层需要判断是否是多表查询, 来进行输出
+                    rc=selectToTupleSet(db, session_event, selects.sub_select[con.left_attr.sub_select_idx],sub_select_left,tmp);//获取子查询结果
+                    con.left_is_attr=0;//改为value
+                    rc=tupleSetToValue(con.left_value,sub_select_left,con.comp);//将子查询改为可以正常使用的值
+                }
+            }
+
+
+        }
+    }
+
+
   //对多个单表查询的结果进行处理, 并赋值给result
   if (tuple_sets.size() > 1) {
     is_mul_table=1;
@@ -538,7 +609,7 @@ RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &select
         join_left_set.set_schema(join_right_set.get_schema());
         for(const Tuple& item_right:join_right_set.tuples()){
           Tuple tmp;
-          for(std::shared_ptr<TupleValue> t:item_right.values()){
+          for(const std::shared_ptr<TupleValue>& t:item_right.values()){
             tmp.add(t);
           }
           join_left_set.add(std::move(tmp));

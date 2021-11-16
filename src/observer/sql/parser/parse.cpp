@@ -52,6 +52,15 @@ void order_attr_init(OrderAttr *order_attr, const char *relation_name, const cha
   order_attr->type = order_type;
   order_attr->attribute_name = strdup(attribute_name);
 }
+//TODO: add group group_attr_init
+void group_attr_init(GroupAttr *group_attr, const char *relation_name, const char *attribute_name){
+    if (relation_name != nullptr){
+        group_attr->relation_name = strdup(relation_name);
+    } else {
+        group_attr->relation_name = nullptr;
+    }
+    group_attr->attribute_name = strdup(attribute_name);
+}
 void relation_attr_destroy(RelAttr *relation_attr) {
   free(relation_attr->relation_name);
   free(relation_attr->attribute_name);
@@ -133,6 +142,10 @@ void selects_append_attribute(Selects *selects, RelAttr *rel_attr) {
 //TODO: add order selects_append_order
 void selects_append_order(Selects *selects, OrderAttr *order_attr) {
   selects->orderattrs[selects->order_num++] = *order_attr;
+}
+//TODO: add group selects_append_group
+void selects_append_group(Selects *selects, GroupAttr *group_attr) {
+    selects->groupattrs[selects->group_num++] = *group_attr;
 }
 void selects_append_relation(Selects *selects, const char *relation_name) {
   selects->relations[selects->relation_num++] = strdup(relation_name);
@@ -262,21 +275,29 @@ void drop_table_destroy(DropTable *drop_table) {
   drop_table->relation_name = nullptr;
 }
 
+void IndexColumn_attr_init(IndexColumn *indexColumn,const char *column_name){
+    indexColumn->column_name=strdup(column_name);
+}
 void create_index_init(CreateIndex *create_index, const char *index_name, 
-                       const char *relation_name, const char *attr_name, const int is_unique) {
+                       const char *relation_name, const int is_unique) {
   create_index->index_name = strdup(index_name);
   create_index->relation_name = strdup(relation_name);
-  create_index->attribute_name = strdup(attr_name);
   create_index->is_unique = is_unique;
+}
+void create_index_append_attribute(CreateIndex *createIndex, IndexColumn *indexColumn){
+    createIndex->attribute_names[createIndex->column_counts++] = *indexColumn;
+}
+void IndexColumn_destroy(IndexColumn *indexColumn){
+    free(indexColumn->column_name);
+    indexColumn->column_name= nullptr;
 }
 void create_index_destroy(CreateIndex *create_index) {
   free(create_index->index_name);
   free(create_index->relation_name);
-  free(create_index->attribute_name);
-
+  for (int i = 0;i<create_index->column_counts;i++)
+      IndexColumn_destroy(&create_index->attribute_names[i]);
   create_index->index_name = nullptr;
   create_index->relation_name = nullptr;
-  create_index->attribute_name = nullptr;
 }
 
 void drop_index_init(DropIndex *drop_index, const char *index_name) {

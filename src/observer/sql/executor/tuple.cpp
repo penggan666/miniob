@@ -137,16 +137,30 @@ void TupleSchema::print(std::ostream &os) const {
   //TODO: add join
   for (std::vector<TupleField>::const_iterator iter = fields_.begin(), end = --fields_.end();
        iter != end; ++iter) {
+    if (iter->aggregate_name()!=AGG_NO){
+        os << iter->aggregate_name_str() << "(";
+    }
     if (table_names.size() > 1) {
       os << iter->table_name() << ".";
     }
-    os << iter->field_name() << " | ";
+    os << iter->field_name();
+    if (iter->aggregate_name()!=AGG_NO){
+        os << ")";
+    }
+    os << " | ";
   }
 
+  if(fields().back().aggregate_name()!=AGG_NO){
+      os << fields().back().aggregate_name_str() << "(";
+  }
   if (table_names.size() > 1) {
     os << fields_.back().table_name() << ".";
   }
-  os << fields_.back().field_name() << std::endl;
+  os << fields_.back().field_name();
+  if(fields().back().aggregate_name()!=AGG_NO){
+      os << ")";
+  }
+  os << std::endl;
 }
 //TODO: add join schema_print_rm_tmp 去掉临时列
 void TupleSchema::print_rm_tmp(std::ostream &os,std::vector<int>& real_column)const{
@@ -156,12 +170,27 @@ void TupleSchema::print_rm_tmp(std::ostream &os,std::vector<int>& real_column)co
   }
   int i;
   for(i=0;i<real_column.size()-1;i++){
+      if (fields_[real_column[i]].aggregate_name()!=AGG_NO){
+          os << fields_[real_column[i]].aggregate_name_str() << "(";
+      }
       os << fields_[real_column[i]].table_name() << ".";
-      os << fields_[real_column[i]].field_name() << " | ";
+      os << fields_[real_column[i]].field_name();
+      if (fields_[real_column[i]].aggregate_name()!=AGG_NO){
+          os << ")";
+      }
+      os << " | ";
+  }
+  if (fields_[real_column[i]].aggregate_name()!=AGG_NO){
+      os << fields_[real_column[i]].aggregate_name_str() << "(";
   }
   os << fields_[real_column[i]].table_name() <<".";
-  os << fields_[real_column[i]].field_name() << std::endl;
+  os << fields_[real_column[i]].field_name();
+  if (fields_[real_column[i]].aggregate_name()!=AGG_NO){
+    os << ")";
+  }
+  os << std::endl;
 }
+
 
 /////////////////////////////////////////////////////////////////////////////
 TupleSet::TupleSet(TupleSet &&other) : tuples_(std::move(other.tuples_)), schema_(other.schema_){
@@ -224,6 +253,87 @@ void TupleSet::sortTupleByOrder(const std::vector<int> &fieldIndex, const std::v
         }
     }
 }
+TupleSet TupleSet::groupbyTuple(const std::vector<int> &fieldIndex) {
+    TupleSet result;
+    TupleSchema tupleSchema;
+    Tuple tuple;
+    std::vector<TupleField> tuple_fileds=schema_.fields();
+    std::vector<bool> isAsc;
+    int set_schema=0;
+    //先对所有tuple按照group by字段进行排序
+    for (int i=0;i<fieldIndex.size();i++)
+        isAsc.push_back(true);
+    sortTupleByOrder(fieldIndex,isAsc);
+    //将不同group字段放入到不同的tupleset中
+    TupleSet tupleset;
+    tupleset.set_schema(schema_);
+    for (int i=0;i<tuples_.size();i++){
+        int i1=i+1;
+        int allequal=1;
+        if (i1<tuples_.size()){
+            for (int j=0;j<fieldIndex.size();j++){
+                int fi = fieldIndex[j];
+                if(tuples_[i1].get(fi).compare(tuples_[i].get(fi))!=0){
+                    allequal=0;
+                }
+            }
+        }
+        std::vector<std::shared_ptr<TupleValue>> tuplevalues=tuples_[i].values();
+        Tuple tuple1;
+        for(int m=0;m<tuplevalues.size();m++)
+            tuple1.add(tuplevalues[m]);
+        tupleset.tuples_.emplace_back(std::move(tuple1));
+        if(allequal==0||i==tuples_.size()-1){
+            //对当前分组做一次聚合
+            for(int k=0;k<tuple_fileds.size();k++){
+                switch (tuple_fileds[k].aggregate_name()) {
+                    case AGG_MIN:{
+                        tupleSchema.add(tuple_fileds[k].type(), tuple_fileds[k].table_name(), tuple_fileds[k].field_name(), AGG_MIN);
+                        if (tupleset.size()>0)
+                            tuple.add(tupleset.minTuple(k)[k]);
+                    }
+                        break;
+                    case AGG_MAX: {
+                        tupleSchema.add(tuple_fileds[k].type(), tuple_fileds[k].table_name(), tuple_fileds[k].field_name(), AGG_MAX);
+                        if (tupleset.size()>0)
+                            tuple.add(tupleset.maxTuple(k)[k]);
+                    }
+                        break;
+                    case AGG_COUNT:{
+                        tupleSchema.add(INTS, tuple_fileds[k].table_name(), tuple_fileds[k].field_name(), AGG_COUNT);
+                        tuple.add(tupleset.countTupleColumn(k),0);
+                    }
+                        break;
+                    case AGG_AVG:{
+                        tupleSchema.add(FLOATS, tuple_fileds[k].table_name(),tuple_fileds[k].field_name(), AGG_AVG);
+                        if (tupleset.size()>0){
+                            float result = tupleset.avgTuple(k);
+                            if (result==-1)
+                                tuple.add(result,1);
+                            else
+                                tuple.add(result,0);
+                        }
+                    }
+                        break;
+                    case AGG_NO: {
+                        tupleSchema.add(tuple_fileds[k].type(), tuple_fileds[k].table_name(),
+                                        tuple_fileds[k].field_name(), AGG_NO);
+                        tuple.add(tuples_[i].values()[k]);
+                    }
+                        break;
+                }
+            }
+            if (set_schema==0) {
+                result.set_schema(tupleSchema);
+                set_schema=1;
+            }
+            result.add(std::move(tuple));
+            tupleset.tuples_.clear();
+        }
+    }
+    return result;
+}
+
 const std::vector<std::shared_ptr<TupleValue>> TupleSet::minTuple(int i) {
     sortTuple(i);
     for (int j=0;j<tuples_.size();j++){

@@ -593,7 +593,7 @@ RC Table::create_index(Trx *trx, const char *index_name, int columns_count, cons
             LOG_ERROR("Failed to add index (%s) on table (%s). error=%d:%s", index_name, name(), rc, strrc(rc));
             return rc;
         }
-        // 创建元数据临时文件
+    /*    // 创建元数据临时文件
         std::string tmp_file = table_meta_file(base_dir_.c_str(), name()) + ".tmp";
         std::fstream fs;
         fs.open(tmp_file, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
@@ -616,7 +616,7 @@ RC Table::create_index(Trx *trx, const char *index_name, int columns_count, cons
                     "Failed to rename tmp meta file (%s) to normal meta file (%s) while creating index (%s) on table (%s). " \
               "system error=%d:%s", tmp_file.c_str(), meta_file.c_str(), index_name, name(), errno, strerror(errno));
             return RC::IOERR;
-        }
+        }*/
 
         table_meta_.swap(new_table_meta);
 

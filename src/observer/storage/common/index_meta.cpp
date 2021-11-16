@@ -48,6 +48,7 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
   const Json::Value &name_value = json_value[FIELD_NAME];
   const Json::Value &columns_count = json_value[COLUMNS_COUNT];
   const Json::Value &field_value = json_value[FIELD_FIELD_NAME];
+  const Json::Value &field_value1 = json_value[FIELD_FIELD_NAME];
   const Json::Value &is_unique = json_value[IS_UNIQUE];
   if (!name_value.isString()) {
     LOG_ERROR("Index name is not a string. json value=%s", name_value.toStyledString().c_str());
@@ -60,26 +61,11 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
     return RC::GENERIC_ERROR;
   }
 
-/*  const std::string str=field_value.asString();
-  const std::string delim=",";
-  char * strs = new char[str.length() + 1] ;
-  strcpy(strs, str.c_str());
-
-  char * d = new char[delim.length() + 1];
-  strcpy(d, delim.c_str());
-  char *p=strtok(strs,d);
-  while(p){
-      if (nullptr==table.field(p)) {
-          LOG_ERROR("Deserialize index [%s]: no such field: %s", name_value.asCString(), field_value.asCString());
-          return RC::SCHEMA_FIELD_MISSING;
-      }
-  }*/
   const FieldMeta *field = table.field(field_value.asCString());
   if (nullptr == field) {
     LOG_ERROR("Deserialize index [%s]: no such field: %s", name_value.asCString(), field_value.asCString());
     return RC::SCHEMA_FIELD_MISSING;
   }
-
   return index.init(name_value.asCString(),columns_count.asInt(), field_value.asString(), is_unique.asInt());
 }
 

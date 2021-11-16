@@ -314,9 +314,13 @@ TupleSet TupleSet::groupbyTuple(const std::vector<int> &fieldIndex) {
                                 tuple.add(result,0);
                         }
                     }
-                    case AGG_NO:
-                        tupleSchema.add(tuple_fileds[k].type(),tuple_fileds[k].table_name(),tuple_fileds[k].field_name(),AGG_NO);
+                        break;
+                    case AGG_NO: {
+                        tupleSchema.add(tuple_fileds[k].type(), tuple_fileds[k].table_name(),
+                                        tuple_fileds[k].field_name(), AGG_NO);
                         tuple.add(tuples_[i].values()[k]);
+                    }
+                        break;
                 }
             }
             if (set_schema==0) {

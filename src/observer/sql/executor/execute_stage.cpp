@@ -622,6 +622,7 @@ RC selectToTupleSet(const char *db, SessionEvent *session_event, Selects &select
                                 tuple.add(result, 0);
                         }
                     }
+                        break;
                     case AGG_NO:
                         break;
                 }

@@ -97,7 +97,26 @@ RC Table::create(const char *path, const char *name, const char *base_dir, int a
   // 记录元数据到文件中
   table_meta_.serialize(fs);
   fs.close();
-
+  //TODO: add text:为text字段创建相关的文件
+  for(size_t i=0;i<attribute_count;i++){
+      if(attributes[i].type==TEXTS){
+          const char* attr_name=attributes[i].name;
+          std::string text_path=text_data_file(base_dir,name,attr_name);
+          int fd2 = ::open(text_path.c_str(), O_WRONLY   | O_CREAT, 0600);//注意o_excl会在文件存在时报错
+          if(fd2==-1){
+              LOG_ERROR("Failed to open file for text. file name=%s", text_path.c_str());
+              return RC::IOERR;
+          }
+          //第一行存储总记录数, 初始为0
+          int tmp=0;
+          ssize_t res=write(fd2,&tmp,sizeof (tmp));
+          if(res==-1){
+              LOG_ERROR("Failed to write file for text. file name=%s", text_path.c_str());
+              return RC::IOERR;
+          }
+          close(fd2);
+      }
+  }
   std::string data_file = std::string(base_dir) + "/" + name + TABLE_DATA_SUFFIX;
   data_buffer_pool_ = theGlobalDiskBufferPool();
   rc = data_buffer_pool_->create_file(data_file.c_str());
@@ -228,7 +247,7 @@ RC Table::insert_record(Trx *trx, Record *record) {
   }
   return rc;
 }
-RC Table::insert_record(Trx *trx, int value_num, const Value *values) {
+RC Table::insert_record(Trx *trx, int value_num,Value *values) {
   if (value_num <= 0 || nullptr == values ) {
     LOG_ERROR("Invalid argument. value num=%d, values=%p", value_num, values);
     return RC::INVALID_ARGUMENT;
@@ -258,13 +277,15 @@ RC Table::insert_record(Trx *trx, int value_num, const Value *values) {
 const char *Table::name() const {
   return table_meta_.name();
 }
-
+const char *Table::base()const{
+    return base_dir_.c_str();
+}
 const TableMeta &Table::table_meta() const {
   return table_meta_;
 }
 
 
-RC Table::make_record(int value_num, const Value *values, char ** &record_out) {
+RC Table::make_record(int value_num, Value *values, char ** &record_out) {
   // 检查字段类型是否一致
   // TODO:加入对批量插入的处理
   int table_meta_value_num=table_meta_.field_num()-table_meta_.sys_field_num();
@@ -276,7 +297,7 @@ RC Table::make_record(int value_num, const Value *values, char ** &record_out) {
   std::map<int,int> map_date;//用于记录遇到的date值, 因为传入的value不能修改, 只能在检查阶段记录下来
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i % table_meta_value_num + normal_field_start_index);
-    const Value &value = values[i];
+    Value &value = values[i];
     if (field->type() != value.type) {
       //TODO: add date when insert date
       int date_i;
@@ -284,7 +305,15 @@ RC Table::make_record(int value_num, const Value *values, char ** &record_out) {
           map_date.insert(std::pair<int,int>(i,date_i));
       } else if(field->is_null()==1&&value.type==UNDEFINED){
           LOG_ERROR("this is a null value");
-      } else{
+      }else if(field->type()==TEXTS&&value.type==CHARS){
+          //TODO: add text 对text类型的数据进行处理, 将char转为对应index
+          int index=insertText(base_dir_.c_str(),name(),field->name(),(char*)value.data);
+          if(index==-1){
+              return RC::IOERR;
+          }
+          memcpy(value.data,&index,sizeof (int ));//text类型存储对应数据的
+      }
+      else{
         LOG_ERROR("Invalid value type. field name=%s, type=%d, but given=%d",
         field->name(), field->type(), value.type);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;

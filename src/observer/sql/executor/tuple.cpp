@@ -488,6 +488,14 @@ void TupleRecordConverter::add_record(const char *record) {
         tuple.add(s, strlen(s),is_null);//TODO:join 注意tuple阶段的date类型会被初始化位StringValue
       }
       break;
+        case TEXTS:{
+            int index= *(int*)(record + field_meta->offset() + sizeof(int));//对应data文件的位置
+            char * text_raw= static_cast<char *>(malloc(TEXT_MAX_NUM + 1));
+            memset(text_raw,0,TEXT_MAX_NUM+1);
+            readText(table_->base(),table_->name(),field_meta->name(),text_raw,index);
+            tuple.add(text_raw, strlen(text_raw),is_null);
+        }
+        break;
       default: {
         LOG_PANIC("Unsupported field type. type=%d", field_meta->type());
       }

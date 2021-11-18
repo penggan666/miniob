@@ -17,7 +17,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "storage/common/table_meta.h"
 #include "condition_filter.h"
-
+#include "tools/simple_tool.h"
 class DiskBufferPool;
 class RecordFileHandler;
 class ConditionFilter;
@@ -51,7 +51,7 @@ public:
    */
   RC open(const char *meta_file, const char *base_dir);
   
-  RC insert_record(Trx *trx, int value_num, const Value *values);
+  RC insert_record(Trx *trx, int value_num, Value *values);
   RC update_record(Trx *trx, ConditionFilter *filter, const char *attribute_name, const Value *value, int *updated_count);
   RC delete_record(Trx *trx, ConditionFilter *filter, int *deleted_count);
 
@@ -61,7 +61,7 @@ public:
 
 public:
   const char *name() const;
-
+  const char *base() const;
   const TableMeta &table_meta() const;
 
   RC sync();
@@ -71,7 +71,6 @@ public:
   RC commit_delete(Trx *trx, const RID &rid);
   RC rollback_insert(Trx *trx, const RID &rid);
   RC rollback_delete(Trx *trx, const RID &rid);
-
 private:
   RC scan_record(Trx *trx, ConditionFilter *filter, int limit, void *context, RC (*record_reader)(Record *record, void *context));
   RC scan_record_by_index(Trx *trx, IndexScanner *scanner, ConditionFilter *filter, int limit, void *context, RC (*record_reader)(Record *record, void *context));
@@ -81,7 +80,6 @@ private:
   RC insert_record(Trx *trx, Record *record);
   RC delete_record(Trx *trx, Record *record);
   RC update_record(Trx *trx, Record *record, const char *attribute_name, const Value *value, int *updated_count);
-
 private:
   friend class RecordUpdater;
   friend class RecordDeleter;
@@ -90,7 +88,7 @@ private:
   RC delete_entry_of_indexes(const char *record, const RID &rid, bool error_on_not_exists);
 private:
   RC init_record_handler(const char *base_dir);
-  RC make_record(int value_num, const Value *values, char ** &record_out);
+  RC make_record(int value_num, Value *values, char ** &record_out);
 
 private:
   Index *find_index(const char *index_name) const;

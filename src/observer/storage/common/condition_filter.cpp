@@ -77,6 +77,10 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
     }
     left.attr_length = field_left->len();
     left.attr_offset = field_left->offset();
+    //TODO:add text 为了能找到对应data文件
+    left.base_dir= strdup(table.base());
+    left.table_name= strdup(table.name());
+    left.attr_name= strdup(field_left->name());
 
     left.value = nullptr;
 
@@ -100,6 +104,10 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
     right.attr_length = field_right->len();
     right.attr_offset = field_right->offset();
     type_right = field_right->type();
+      //TODO:add text 为了能找到对应data文件
+      right.base_dir= strdup(table.base());
+      right.table_name= strdup(table.name());
+      right.attr_name= strdup(field_right->name());
 
     right.value = nullptr;
   } else {
@@ -120,7 +128,6 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
   // 但是选手们还是要实现。这个功能在预选赛中会出现
   //TODO: add date 对于date的比较， 应该注意判断比较的type是string， 且string是符合date的情况
   if (type_left != type_right) {
-    
     int date_i;
     if(left.is_attr&&type_left==DATES&&(!right.is_attr)&&type_right==CHARS&&(date_i=dateToInt((char*)right.value))!=-1){
       memcpy(right.value,&date_i, sizeof(date_i));
@@ -137,7 +144,11 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
          type_left=FLOAT_INT;
     }else if(type_left==INTS&&type_right==FLOATS){//应对子查询需要不同类型比较
         type_left=INT_FLOAT;
-    }else if(type_left == UNDEFINED || type_right == UNDEFINED) {
+    }//TODO: add text
+    else if((type_left==TEXTS&&type_right==CHARS)||(type_left==CHARS&&type_right==TEXTS)){
+        type_left=TEXTS;
+    }
+    else if(type_left == UNDEFINED || type_right == UNDEFINED) {
         LOG_WARN("this is a null value compare");
     }else{
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
@@ -154,15 +165,33 @@ bool DefaultConditionFilter::filter(const Record &rec) const
   int is_null = 0;
 
   if (left_.is_attr) {
-      left_value = (char *)(rec.data + left_.attr_offset + sizeof(int));
-      is_null = *(int *)(rec.data + left_.attr_offset);//判断属性列是否为null
+      if(attr_type_==TEXTS){//TODO:add text 去读取相应值
+          int index = *(int *)(rec.data + left_.attr_offset + sizeof(int));
+          char* tmp= (char*)(malloc(TEXT_MAX_NUM + 1));
+          memset(tmp,0,TEXT_MAX_NUM+1);
+          readText(left_.base_dir,left_.table_name,left_.attr_name,tmp,index);
+          left_value=tmp;
+      }else{
+          left_value = (char *)(rec.data + left_.attr_offset + sizeof(int));
+          is_null = *(int *)(rec.data + left_.attr_offset);//判断属性列是否为null
+      }
+
   } else {
     left_value = (char *)left_.value;
   }
 
   if (right_.is_attr) {
-      right_value = (char *)(rec.data + right_.attr_offset + sizeof(int));
-      is_null = *(int *)(rec.data + left_.attr_offset);
+      if(attr_type_==TEXTS){
+          int index = *(int *)(rec.data + right_.attr_offset + sizeof(int));
+          char* tmp=(char *)(malloc(TEXT_MAX_NUM + 1));
+          memset(tmp,0,TEXT_MAX_NUM+1);
+          readText(right_.base_dir,right_.table_name,right_.attr_name,tmp,index);
+          right_value=tmp;
+      }else{
+          right_value = (char *)(rec.data + right_.attr_offset + sizeof(int));
+          is_null = *(int *)(rec.data + left_.attr_offset);
+      }
+
   } else {
     right_value = (char *)right_.value;
   }
@@ -198,10 +227,12 @@ bool DefaultConditionFilter::filter(const Record &rec) const
 
   int cmp_result = 0;
   switch (attr_type_) {
+      case TEXTS://TODO: add text
     case CHARS: {  // 字符串都是定长的，直接比较
       // 按照C字符串风格来定
       cmp_result = strcmp(left_value, right_value);
     } break;
+    break;
     //TODO: add date
     case DATES:
     case INTS: {

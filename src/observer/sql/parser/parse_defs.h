@@ -70,7 +70,7 @@ typedef struct {
 } GroupAttr;
 
 //属性值类型
-typedef enum { UNDEFINED, CHARS, INTS, FLOATS, DATES,FLOAT_INT,INT_FLOAT,ARR_CHARS,ARR_INTS,ARR_FLOATS } AttrType;
+typedef enum { UNDEFINED, CHARS, INTS, FLOATS, DATES,TEXTS,FLOAT_INT,INT_FLOAT,ARR_CHARS,ARR_INTS,ARR_FLOATS } AttrType;
 
 //属性值
 typedef struct _Value {

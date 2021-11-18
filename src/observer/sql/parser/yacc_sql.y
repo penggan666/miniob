@@ -122,6 +122,7 @@ ParserContext *get_context(yyscan_t scanner)
 		ISNULL
 		IS
 		NULLABLE
+		TEXT
 %union {
   struct _Attr *attr;
   struct _Condition *condition1;
@@ -335,6 +336,7 @@ type:
        | FLOAT_T { $$=FLOATS; }
 	   //TODO: add date
 	   | DATE_T{$$=DATES;}
+	   | TEXT{$$=TEXTS;}
        ;
 ID_get:
 	ID 

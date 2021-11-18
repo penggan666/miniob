@@ -26,6 +26,12 @@ struct ConDesc {
   int    attr_length; // 如果是属性，表示属性值长度
   int    attr_offset; // 如果是属性，表示在记录中的偏移量
   void * value;       // 如果是值类型，这里记录值的数据
+  //Todo: add Text 为了能将index去找到文件读取记录, 需要记录相关信息
+  char* base_dir;
+  char* table_name;
+  char* attr_name;
+
+
 };
 
 class ConditionFilter {

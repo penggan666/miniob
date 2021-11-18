@@ -703,7 +703,11 @@ RC Table::update_record(Trx *trx, Record *record,const char *attribute_name, con
               int value_data;
               if (field->type()==DATES && value->type==CHARS && (value_data=dateToInt((char*)value->data))!=-1){
                   memcpy(value1.data,&value_data, sizeof(value_data));
-              }else{
+              }else if(field->type()==TEXTS&&value->type==CHARS){
+                  int index=insertText(base_dir_.c_str(),name(),field->name(),(char*)value->data);
+                  memcpy(value1.data,&index,sizeof (int ));
+              }
+              else{
                 return RC::SCHEMA_FIELD_TYPE_MISMATCH;
               }
             }

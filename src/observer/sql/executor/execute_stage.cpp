@@ -879,7 +879,7 @@ static RC schema_add_field(Table *table, const char *field_name, TupleSchema &sc
     schema.add_if_not_exists(field_meta->type(), table->name(), field_meta->name(), aggregate_name);
     return RC::SUCCESS;
 }
-
+//test
 //TODO:add join 判断两个表中对比属性是否类型相同
 bool isRightCmp(Table& left_table,Table&right_table,const Condition& condition){
     AttrType type_left = UNDEFINED;

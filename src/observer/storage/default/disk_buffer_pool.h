@@ -21,17 +21,16 @@ See the Mulan PSL v2 for more details. */
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
-#include <list>
 
 #include <vector>
 
 #include "rc.h"
-
+#include"lru_replacer.h"
 typedef int PageNum;
 
 //
 #define BP_INVALID_PAGE_NUM (-1)
-#define BP_PAGE_SIZE (1 << 12)
+#define BP_PAGE_SIZE (1 << 12)//4K
 #define BP_PAGE_DATA_SIZE (BP_PAGE_SIZE - sizeof(PageNum))
 #define BP_FILE_SUB_HDR_SIZE (sizeof(BPFileSubHeader))
 #define BP_BUFFER_SIZE 50
@@ -44,24 +43,24 @@ typedef struct {
 // sizeof(Page) should be equal to BP_PAGE_SIZE
 
 typedef struct {
-  PageNum page_count;
-  int allocated_pages;
-} BPFileSubHeader;
+  PageNum page_count;//总页数
+  int allocated_pages;//已经分配的页 通过bitmap判断是否被分配:if (((file_handle->bitmap[byte]) & (1 << bit)) == 0) { (file_handle->file_sub_header->allocated_pages)++;
+} BPFileSubHeader;//位于文件头部
 
 typedef struct {
-  bool dirty;
-  unsigned int pin_count;
-  unsigned long acc_time;
-  int file_desc;
+  bool dirty;//存在未同步到磁盘的修改
+  unsigned int pin_count;//被引用的次数
+  unsigned long acc_time;//???
+  int file_desc;//对应文件描述符
   Page page;
 } Frame;
 
 typedef struct {
-  bool open;
+  bool open;//装载完page后开放访问
   Frame *frame;
 } BPPageHandle;
 
-class BPFileHandle{
+class BPFileHandle{//open_list里装的就是*BPFileHandle
 public:
   BPFileHandle() {
     memset(this, 0, sizeof(*this));
@@ -69,12 +68,12 @@ public:
 
 public:
   bool bopen;
-  const char *file_name;
-  int file_desc;
-  Frame *hdr_frame;
-  Page *hdr_page;
-  char *bitmap;
-  BPFileSubHeader *file_sub_header;
+  const char *file_name;//文件名， 可以用于在open_list里查找文件是否已经打开
+  int file_desc;//对应fd
+  Frame *hdr_frame;//内存file分配的frame, 用来装hdr_page,即page_num=0,文件第一个page
+  Page *hdr_page;//= &(file_handle->hdr_frame->page);
+  char *bitmap;//= file_handle->hdr_page->data + BP_FILE_SUB_HDR_SIZE; 每位对应page, 示例:file_handle->bitmap[page_num / 8] & (1 << (page_num % 8))) == 0
+  BPFileSubHeader *file_sub_header;//=(BPFileSubHeader *)file_handle->hdr_page->data;
 } ;
 
 class BPManager {
@@ -87,6 +86,8 @@ public:
       allocated[i] = false;
       frame[i].pin_count = 0;
     }
+    //TODO: LRU update
+    replacer_=new LRUReplacer(size);
   }
 
   ~BPManager() {
@@ -98,11 +99,26 @@ public:
   }
 
   Frame *alloc() {
-    return nullptr; // TODO for test
+    return nullptr; // TODO for test 未使用
   }
 
   Frame *get(int file_desc, PageNum page_num) {
-    return nullptr; // TODO for test
+    return nullptr; // TODO for test 未使用
+  }
+  bool Victim(int *frame_id){
+    return replacer_->Victim(frame_id);
+  }
+  void Pin(int frame_id){
+    replacer_->Pin(frame_id);
+  }
+  void Pin(Frame* frame_){//直接给指针, 需要换算成frame里的index
+    Pin(frame_-frame);
+  }
+  void Unpin(int frame_id){
+    replacer_->Unpin(frame_id);
+  }
+  void Unpin(Frame* frame_){
+    Unpin(frame_-frame);
   }
 
   Frame *getFrame() { return frame; }
@@ -113,6 +129,7 @@ public:
   int size;
   Frame * frame = nullptr;
   bool *allocated = nullptr;
+  Replacer *replacer_;//提供页面淘汰算法的接口实现
 };
 
 class DiskBufferPool {
@@ -166,8 +183,8 @@ public:
    * @param file_handle
    * @param page_num 如果不指定page_num 将刷新所有页
    */
-  RC force_page(int file_id, PageNum page_num);
 
+  RC force_page(int file_id, PageNum page_num);
   /**
    * 标记指定页面为“脏”页。如果修改了页面的内容，则应调用此函数，
    * 以便该页面被淘汰出缓冲区时系统将新的页面数据写入磁盘文件
